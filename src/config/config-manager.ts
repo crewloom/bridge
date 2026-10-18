@@ -203,6 +203,25 @@ export class ConfigManager {
     });
   }
 
+  public saveProject(): void {
+    const payload = {
+      bot_token: this.config.botToken,
+      allowed_chat_id: this.config.allowedChatId,
+      default_agent: this.config.defaultAgent,
+      default_model: this.config.defaultModel,
+      favorite_models: this.config.favoriteModels,
+      language: this.config.language,
+      deny_patterns: this.config.denyPatterns,
+      allowed_paths: this.config.allowedPaths,
+      extra: this.config.extra,
+    };
+
+    fs.writeFileSync(this.projectConfigPath, JSON.stringify(payload, null, 2), {
+      encoding: 'utf-8',
+      mode: 0o600,
+    });
+  }
+
   public addWorkspace(newWorkspace: string): boolean {
     const resolved = path.resolve(newWorkspace);
     if (!fs.existsSync(resolved)) return false;

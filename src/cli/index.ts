@@ -72,7 +72,7 @@ export function checkOpenCodeCli(): boolean {
 }
 
 /**
- * Interactive pairing wizard with automatic Telegram chat discovery.
+ * Interactive pairing wizard with automatic Telegram chat discovery and bot creation guide.
  */
 export async function cmdInit(): Promise<void> {
   printBanner();
@@ -89,15 +89,39 @@ export async function cmdInit(): Promise<void> {
   });
   const question = (q: string): Promise<string> => new Promise((res) => rl.question(q, res));
 
-  const cfgManager = new ConfigManager();
+  // 1. Workspace Directory
+  const defaultDir = process.cwd();
+  log(`\n${C.bold}1. Project Workspace Directory:${C.reset}`);
+  const dirInput = (await question(`Target Directory [${defaultDir}]: `)).trim();
+  const targetDir = path.resolve(dirInput || defaultDir);
+  success(`Target workspace: ${C.bold}${targetDir}${C.reset}`);
+
+  const cfgManager = new ConfigManager(targetDir);
   const existing = cfgManager.config;
 
-  // 1. Bot Token
-  log(`\n${C.bold}1. Telegram Bot Token:${C.reset}`);
-  info('Create a bot via @BotFather on Telegram and copy the API token.');
-  let tokenPrompt = 'Enter your Bot Token: ';
+  // 2. Telegram Bot Configuration
+  log(`\n${C.bold}2. Telegram Bot Setup:${C.reset}`);
+  log(`Do you already have a Telegram Bot token for this project?`);
+  log(`  ${C.cyan}[1]${C.reset} Yes, I have an existing Bot Token`);
+  log(`  ${C.cyan}[2]${C.reset} No, guide me to create a new Bot with @BotFather in 30 seconds`);
+  
+  const botChoice = (await question(`Select [1/2] (default: 1): `)).trim();
+
+  if (botChoice === '2' || botChoice.toLowerCase() === 'no' || botChoice.toLowerCase() === 'new') {
+    log(`\n${C.cyan}╔═════════════════════════════════════════════════════════════╗${C.reset}`);
+    log(`${C.cyan}║   🤖 How to create a new Telegram Bot via @BotFather:       ║${C.reset}`);
+    log(`${C.cyan}╠═════════════════════════════════════════════════════════════╣${C.reset}`);
+    log(`${C.cyan}║${C.reset} 1. Open Telegram and search for ${C.bold}@BotFather${C.reset} (https://t.me/BotFather)`);
+    log(`${C.cyan}║${C.reset} 2. Send: ${C.bold}/newbot${C.reset}`);
+    log(`${C.cyan}║${C.reset} 3. Enter a friendly display name (e.g. "${path.basename(targetDir)} Control")`);
+    log(`${C.cyan}║${C.reset} 4. Enter a username ending in 'bot' (e.g. "${path.basename(targetDir).toLowerCase().replace(/[^a-z0-9]/g, '_')}_agent_bot")`);
+    log(`${C.cyan}║${C.reset} 5. Copy the HTTP API token provided by BotFather.`);
+    log(`${C.cyan}╚═════════════════════════════════════════════════════════════╝${C.reset}\n`);
+  }
+
+  let tokenPrompt = 'Enter your Telegram Bot Token: ';
   if (existing.botToken) {
-    tokenPrompt = `Enter your Bot Token [${existing.botToken.slice(0, 10)}...]: `;
+    tokenPrompt = `Enter your Telegram Bot Token [${existing.botToken.slice(0, 10)}...]: `;
   }
 
   let token = (await question(tokenPrompt)).trim();
@@ -123,86 +147,130 @@ export async function cmdInit(): Promise<void> {
     process.exit(1);
   }
 
-  // 2. Chat ID Auto-Pairing
-  log(`\n${C.bold}2. Automatic Telegram Chat Pairing:${C.reset}`);
-  info(`Open Telegram, search for ${C.bold}@${botInfo.username}${C.reset}, and click ${C.bold}START${C.reset} (or send /start).`);
-  log(`${C.dim}Listening for updates (up to 90 seconds)...${C.reset}`);
+  // 3. Developer Authentication & Linking
+  log(`\n${C.bold}3. Developer Identification & Pairing:${C.reset}`);
+  info('AgentGram only accepts instructions from authorized developer accounts.');
+  log(`How would you like to link your Developer Telegram account?`);
+  log(`  ${C.cyan}[1]${C.reset} Auto-Pair (Recommended): Send /start to @${botInfo.username} on Telegram`);
+  log(`  ${C.cyan}[2]${C.reset} Direct Entry: Enter your Telegram Developer ID manually (obtainable from @userinfobot)`);
 
+  const pairChoice = (await question(`Select [1/2] (default: 1): `)).trim();
   let pairedChatId: string | null = null;
   let pairedUser: string | null = null;
-  const startTime = Date.now();
-  let offset = 0;
 
-  // Flush stale updates first
-  try {
-    const stale = await tempTg.getUpdates(-1, 1);
-    if (stale.length > 0) {
-      offset = stale[stale.length - 1]!.update_id + 1;
+  if (pairChoice === '2' || pairChoice.toLowerCase() === 'direct') {
+    let idPrompt = 'Enter Developer Telegram ID (or Chat ID): ';
+    if (existing.allowedChatId) {
+      idPrompt = `Enter Developer Telegram ID [${existing.allowedChatId}]: `;
     }
-  } catch {}
+    const manualInput = (await question(idPrompt)).trim();
+    pairedChatId = manualInput || existing.allowedChatId || null;
 
-  while (!pairedChatId && Date.now() - startTime < 90000) {
-    try {
-      const updates = await tempTg.getUpdates(offset, 2);
-      for (const u of updates) {
-        offset = u.update_id + 1;
-        const msg = u.message;
-        if (msg && msg.chat && msg.from) {
-          pairedChatId = String(msg.chat.id);
-          pairedUser = msg.from.first_name || msg.from.username || 'Owner';
-          break;
-        }
-      }
-    } catch {
-      await new Promise((r) => setTimeout(r, 1000));
-    }
     if (!pairedChatId) {
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-  }
-
-  if (!pairedChatId) {
-    warn('Auto-pairing timed out.');
-    const manual = (await question('Enter your Telegram Chat ID manually (or leave blank to exit): ')).trim();
-    if (manual) {
-      pairedChatId = manual;
-    } else {
-      error('Chat ID is required for security.');
+      error('Developer ID is required.');
       rl.close();
       process.exit(1);
     }
-  } else {
-    success(`Paired successfully with ${C.bold}${pairedUser}${C.reset} (Chat ID: ${pairedChatId})!`);
+
+    info(`Sending verification ping to Developer ID: ${pairedChatId}...`);
     try {
       await tempTg.sendMessage(
         pairedChatId,
-        '🎉 <b>AgentGram Paired Successfully!</b>\nYour machine is now securely linked to this Telegram chat.'
+        `⚡ <b>AgentGram Developer Authentication</b>\nSuccessfully linked to workspace: <code>${escapeHtml(targetDir)}</code>`
       );
+      success(`Verification ping sent successfully to Telegram ID: ${pairedChatId}`);
+    } catch (e) {
+      warn(`Could not ping chat ID ${pairedChatId}: ${(e as Error).message}`);
+      warn(`Make sure you have started a chat with @${botInfo.username} on Telegram first!`);
+    }
+  } else {
+    info(`Open Telegram, search for ${C.bold}@${botInfo.username}${C.reset}, and click ${C.bold}START${C.reset} (or send /start).`);
+    log(`${C.dim}Listening for updates (up to 90 seconds)...${C.reset}`);
+
+    const startTime = Date.now();
+    let offset = 0;
+
+    // Flush stale updates first
+    try {
+      const stale = await tempTg.getUpdates(-1, 1);
+      if (stale.length > 0) {
+        offset = stale[stale.length - 1]!.update_id + 1;
+      }
     } catch {}
+
+    while (!pairedChatId && Date.now() - startTime < 90000) {
+      try {
+        const updates = await tempTg.getUpdates(offset, 2);
+        for (const u of updates) {
+          offset = u.update_id + 1;
+          const msg = u.message;
+          if (msg && msg.chat && msg.from) {
+            pairedChatId = String(msg.chat.id);
+            pairedUser = msg.from.username ? `@${msg.from.username}` : msg.from.first_name || 'Developer';
+            break;
+          }
+        }
+      } catch {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+      if (!pairedChatId) {
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+
+    if (!pairedChatId) {
+      warn('Auto-pairing timed out.');
+      const manual = (await question('Enter Developer Telegram ID manually (from @userinfobot): ')).trim();
+      if (manual) {
+        pairedChatId = manual;
+      } else {
+        error('Developer ID is required for security.');
+        rl.close();
+        process.exit(1);
+      }
+    } else {
+      success(`Authenticated Developer: ${C.bold}${pairedUser}${C.reset} (ID: ${pairedChatId})!`);
+      try {
+        await tempTg.sendMessage(
+          pairedChatId,
+          `🎉 <b>AgentGram Mission Control Linked!</b>\nDeveloper: <b>${escapeHtml(pairedUser || 'Authorized')}</b> (ID: <code>${pairedChatId}</code>)\nWorkspace: <code>${escapeHtml(targetDir)}</code>\n\nYour project is now securely controlled from this chat.`
+        );
+      } catch {}
+    }
   }
 
-  // 3. Project Workspace Directory
-  const defaultDir = process.cwd();
-  log(`\n${C.bold}3. Default Workspace Directory:${C.reset}`);
-  const dirInput = (await question(`Target Directory [${defaultDir}]: `)).trim();
-  const targetDir = path.resolve(dirInput || defaultDir);
+  // 4. Configuration Scope (Project-level vs Global)
+  log(`\n${C.bold}4. Configuration Storage Scope:${C.reset}`);
+  log(`Where would you like to save this configuration?`);
+  log(`  ${C.cyan}[1]${C.reset} Project-Level (.agentgram.json in project root) [Recommended: completely isolated]`);
+  log(`  ${C.cyan}[2]${C.reset} Global (~/.config/agentgram/config.json) [Machine-wide default]`);
+
+  const scopeChoice = (await question(`Select [1/2] (default: 1): `)).trim();
+  const isProjectLevel = scopeChoice !== '2';
 
   rl.close();
 
-  // Save configuration
   cfgManager.config.botToken = token;
   cfgManager.config.allowedChatId = pairedChatId;
   cfgManager.config.targetDir = targetDir;
-  cfgManager.saveGlobal();
 
-  log(`\n${C.bold}${C.green}═══════════════════════════════════════════════════════${C.reset}`);
-  success(`Configuration securely saved to: ${cfgManager.globalConfigPath}`);
+  if (isProjectLevel) {
+    cfgManager.saveProject();
+    log(`\n${C.bold}${C.green}═════════════════════════════════════════════════════════════${C.reset}`);
+    success(`Configuration saved locally to: ${C.bold}${cfgManager.projectConfigPath}${C.reset}`);
+    info('This project is completely isolated with its own dedicated bot and settings.');
+  } else {
+    cfgManager.saveGlobal();
+    log(`\n${C.bold}${C.green}═════════════════════════════════════════════════════════════${C.reset}`);
+    success(`Configuration saved globally to: ${C.bold}${cfgManager.globalConfigPath}${C.reset}`);
+  }
+
   log(`\n${C.bold}Next Steps:${C.reset}`);
   log(`  • Start control room in foreground:`);
   log(`    ${C.cyan}npx agentgram start${C.reset}`);
   log(`  • Start in background daemon mode:`);
   log(`    ${C.cyan}npx agentgram start --daemon${C.reset}`);
-  log(`  • Install as persistent OS service (survives reboots):`);
+  log(`  • Install as persistent OS service:`);
   log(`    ${C.cyan}npx agentgram service install${C.reset}\n`);
 }
 
