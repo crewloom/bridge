@@ -36,6 +36,11 @@ def install_service(target_dir=None):
         # Unload existing if loaded
         subprocess.run(["launchctl", "unload", MACOS_PLIST_PATH], capture_output=True)
 
+        path_env = os.environ.get("PATH", "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin")
+        opencode_bin = os.path.expanduser("~/.opencode/bin")
+        if opencode_bin not in path_env:
+            path_env = f"{opencode_bin}:{path_env}"
+
         plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -49,6 +54,11 @@ def install_service(target_dir=None):
         <string>--dir</string>
         <string>{target_dir}</string>
     </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>{path_env}</string>
+    </dict>
     <key>WorkingDirectory</key>
     <string>{target_dir}</string>
     <key>RunAtLoad</key>
