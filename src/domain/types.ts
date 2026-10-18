@@ -19,6 +19,8 @@ export interface AgentgramConfig {
   language: 'en' | 'ar';
   denyPatterns: string[];
   allowedPaths: string[];
+  channel?: string;
+  engine?: string;
   workspaces: string[];
   extra: Record<string, unknown>;
 }

@@ -26,11 +26,12 @@
 
 Developers shouldn't be chained to their desks waiting for an AI agent to finish modifying code, executing test suites, or running remote deployment scripts.
 
-**AgentGram** turns Telegram into a mobile developer cockpit:
-* 📲 **Live Streaming Mission Control:** Real-time progress updates inside a dynamic Telegram message (updates smoothly every ~2.5s with tools, steps, and output tails).
+**AgentGram** turns your phone into a mobile developer cockpit:
+* 📲 **Live Streaming Mission Control:** Real-time progress updates inside a dynamic message (updates smoothly every ~2.5s with tools, steps, and output tails).
 * 🔘 **One-Tap Permission Buttons:** Approve or reject file edits and commands with `[ ✅ Allow Once ]`, `[ ♾️ Always Allow ]`, or `[ ⛔ Reject ]`.
 * ⚡ **Auto Mode:** Enable full autonomy for routine tasks; safety policies automatically intercept destructive commands.
 * 🛡️ **Enterprise Prompt Injection Shield:** Multi-layer defense against role hijacking, jailbreaks, delimiter evasion, and malicious prompt injections.
+* 🔌 **Pluggable Hexagonal Architecture:** Out-of-the-box support for **Telegram** and **OpenCode** as defaults, plus plug-and-play adapters for alternative channels (**Terminal Console**, **Webhooks**, **Slack/Discord**) and coding engines (**Claude Code**, **Aider**, **Shell CLI**).
 * 🌐 **Multi-Machine & Server Ops:** Run operations, SSH jump-host connections, deploy scripts (`pinpoint-go`), and remote log diagnostics directly from your phone.
 * ⚡ **Zero Runtime Dependencies:** 100% Pure Node.js & TypeScript with zero external runtime dependencies. Ultra-lightweight and blazingly fast!
 
@@ -40,19 +41,20 @@ Developers shouldn't be chained to their desks waiting for an AI agent to finish
 
 ```mermaid
 flowchart LR
-    User["📱 Mobile / Telegram App"] <-->|Bot API / Webhook| Daemon["⚡ AgentGram Daemon"]
-    Daemon <-->|Loopback SSE / 127.0.0.1| Server["🤖 OpenCode Server"]
-    Server <-->|Sandboxed Execution| Project["📂 Project Files & Git"]
-    Daemon <-->|Authorized Ops / SSH| Remote["🖥️ Remote VPS / Server"]
+    User["📱 Telegram / Console / Webhook"] <-->|IChannelAdapter| ControlRoom["⚡ AgentGram Control Room"]
+    ControlRoom <-->|IAgentEngine| Engine["🤖 OpenCode / Claude Code / Shell"]
+    Engine <-->|Sandboxed Execution| Project["📂 Project Files & Git"]
+    ControlRoom <-->|Authorized Ops / SSH| Remote["🖥️ Remote VPS / Server"]
 ```
 
-### The Telegram Experience
+### The Live Experience
 
 ```text
 ┌────────────────────────────────────────────────────────┐
 │ ⚡ AgentGram · Live Mission Control                    │
 │                                                        │
-│ Agent: 🧠 build | Model: 🤖 space-bunny-free           │
+│ Agent: 🧠 build (OpenCode) | Mode: 🔒 build           │
+│ Channel: 📡 Telegram Bot                               │
 │ Status: 🟢 Executing bash (npm test)                   │
 │ Step: 4/12 · ⏳ 14s · 📝 3 files modified              │
 │                                                        │
@@ -62,8 +64,8 @@ flowchart LR
 │ > All 14 tests passing                                 │
 │ ────────────────────────────────────────────────────── │
 │                                                        │
-│ [ ⏹ Stop ]      [ 📤 Diff ]      [ 📊 Status ]        │
-│ [ 🧠 Agents ]   [ 🤖 Models ]    [ 🔒 Mode ]           │
+│ [ ⏹ Stop ]      [ 📤 Diff ]      [ 🔒 Mode ]           │
+│ [ 📁 Projects ]                  [ 🌐 Language ]       │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -180,6 +182,8 @@ COMMANDS:
 OPTIONS:
   --dir <path>       Set target project directory (defaults to current working directory)
   --daemon, -d       Run in background as a detached process
+  --channel <name>   Communication channel: telegram (default), console
+  --engine <name>    AI coding engine: opencode (default), shell, claude, aider
   --version, -v      Show version number
 ```
 

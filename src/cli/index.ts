@@ -12,6 +12,14 @@ import { ConfigManager, AGENTGRAM_CONFIG_DIR, LEGACY_CONFIG_DIR } from '../confi
 import { TelegramClient } from '../telegram/telegram-client.js';
 import { OpenCodeClient } from '../opencode/opencode-client.js';
 import { ControlRoom } from '../control-room/control-room.js';
+import { TelegramChannelAdapter } from '../channels/telegram.adapter.js';
+import { ConsoleChannelAdapter } from '../channels/console.adapter.js';
+import { ChannelRegistry } from '../channels/registry.js';
+import type { IChannelAdapter } from '../channels/channel.interface.js';
+import { OpenCodeAdapter } from '../engines/opencode.adapter.js';
+import { ShellEngineAdapter } from '../engines/shell.adapter.js';
+import { EngineRegistry } from '../engines/registry.js';
+import type { IAgentEngine } from '../engines/engine.interface.js';
 import { ServiceManager, getEntryPoint } from '../service/service-manager.js';
 
 export const VERSION = '2.0.0';
@@ -283,10 +291,28 @@ export async function cmdStart(args: string[]): Promise<void> {
   const targetDir = dirIdx !== -1 && args[dirIdx + 1] ? path.resolve(args[dirIdx + 1]!) : process.cwd();
 
   const cfgManager = new ConfigManager(targetDir);
+
+  // Pluggable Channel Resolution
+  const chanIdx = args.indexOf('--channel');
+  const selectedChannel = (chanIdx !== -1 && args[chanIdx + 1]
+    ? args[chanIdx + 1]
+    : cfgManager.config.channel || 'telegram').toLowerCase();
+
+  // Pluggable Agent Engine Resolution
+  const engIdx = args.indexOf('--engine');
+  const selectedEngine = (engIdx !== -1 && args[engIdx + 1]
+    ? args[engIdx + 1]
+    : cfgManager.config.engine || 'opencode').toLowerCase();
+
+  cfgManager.config.channel = selectedChannel;
+  cfgManager.config.engine = selectedEngine;
+
   const errors = cfgManager.validate();
   if (errors.length > 0) {
     for (const err of errors) error(err);
-    log(`\nPlease run ${C.bold}${C.cyan}agentgram init${C.reset} to set up your Telegram credentials.`);
+    if (selectedChannel === 'telegram') {
+      log(`\nPlease run ${C.bold}${C.cyan}agentgram init${C.reset} to set up your Telegram credentials.`);
+    }
     process.exit(1);
   }
 
@@ -300,7 +326,18 @@ export async function cmdStart(args: string[]): Promise<void> {
     const err = fs.openSync(logPath, 'a');
 
     const entryPoint = getEntryPoint();
-    const child = child_process.spawn(process.execPath, [entryPoint, 'start', '--dir', targetDir], {
+    const spawnArgs = [
+      entryPoint,
+      'start',
+      '--dir',
+      targetDir,
+      '--channel',
+      selectedChannel,
+      '--engine',
+      selectedEngine,
+    ];
+
+    const child = child_process.spawn(process.execPath, spawnArgs, {
       cwd: targetDir,
       detached: true,
       stdio: ['ignore', out, err],
@@ -311,34 +348,76 @@ export async function cmdStart(args: string[]): Promise<void> {
     const pidFile = getPidFilePath();
     fs.writeFileSync(pidFile, String(child.pid), 'utf-8');
     success(`AgentGram is running in background (PID: ${child.pid}).`);
+    info(`Channel: ${selectedChannel} | Engine: ${selectedEngine}`);
     info(`Logs: ${logPath}`);
     return;
   }
 
   printBanner();
   info(`Connecting Control Room to workspace: ${C.bold}${targetDir}${C.reset}`);
+  info(`Active Channel: ${C.cyan}${selectedChannel}${C.reset} | AI Engine: ${C.cyan}${selectedEngine}${C.reset}`);
 
-  // Spawn local OpenCode server on loopback
-  let oc: OpenCodeClient;
-  try {
-    info('Spawning private OpenCode server on loopback...');
-    const spawned = await OpenCodeClient.spawnServer(targetDir);
-    oc = spawned.client;
-    success(`OpenCode server online (port: ${spawned.port}).`);
-  } catch (err) {
-    error(`Could not spawn OpenCode server: ${(err as Error).message}`);
-    log(`Make sure OpenCode is installed: ${C.cyan}npm i -g opencode-ai${C.reset}`);
-    process.exit(1);
+  // Resolve Channel Adapter
+  let channelAdapter: IChannelAdapter;
+  if (selectedChannel === 'telegram') {
+    channelAdapter = new TelegramChannelAdapter(cfgManager.config.botToken);
+  } else if (selectedChannel === 'console') {
+    channelAdapter = new ConsoleChannelAdapter();
+  } else {
+    try {
+      channelAdapter = ChannelRegistry.get(selectedChannel, cfgManager.config);
+    } catch (err) {
+      error((err as Error).message);
+      process.exit(1);
+    }
   }
 
-  const tg = new TelegramClient(cfgManager.config.botToken);
-  const room = new ControlRoom(tg, oc, cfgManager);
+  // Resolve Engine Adapter
+  let engineAdapter: IAgentEngine;
+  let spawnedOc: { client: OpenCodeClient; port: number } | undefined;
+
+  if (selectedEngine === 'opencode') {
+    try {
+      info('Spawning private OpenCode server on loopback...');
+      spawnedOc = await OpenCodeClient.spawnServer(targetDir);
+      engineAdapter = new OpenCodeAdapter(spawnedOc.client, targetDir);
+      success(`OpenCode server online (port: ${spawnedOc.port}).`);
+    } catch (err) {
+      error(`Could not spawn OpenCode server: ${(err as Error).message}`);
+      log(`Make sure OpenCode is installed: ${C.cyan}npm i -g opencode-ai${C.reset}`);
+      process.exit(1);
+    }
+  } else if (selectedEngine === 'shell' || selectedEngine === 'sh' || selectedEngine === 'bash') {
+    engineAdapter = new ShellEngineAdapter({ workspaceDir: targetDir, cliCommand: 'sh' });
+    success('Shell CLI Engine initialized.');
+  } else if (selectedEngine === 'claude') {
+    engineAdapter = new ShellEngineAdapter({ workspaceDir: targetDir, cliCommand: 'claude' });
+    success('Claude Code Engine initialized.');
+  } else if (selectedEngine === 'aider') {
+    engineAdapter = new ShellEngineAdapter({ workspaceDir: targetDir, cliCommand: 'aider' });
+    success('Aider Engine initialized.');
+  } else {
+    try {
+      engineAdapter = EngineRegistry.get(selectedEngine, cfgManager.config);
+    } catch (err) {
+      error((err as Error).message);
+      process.exit(1);
+    }
+  }
+
+  const room = new ControlRoom({
+    channel: channelAdapter,
+    engine: engineAdapter,
+    configManager: cfgManager,
+  });
 
   // Graceful shutdown handling
   const cleanup = () => {
     log(`\n${C.yellow}Shutting down AgentGram Control Room...${C.reset}`);
     room.stop();
-    oc.killServer();
+    if (spawnedOc) {
+      spawnedOc.client.killServer();
+    }
     process.exit(0);
   };
 
@@ -480,10 +559,13 @@ export function cmdHelp(): void {
   log(`Options:`);
   log(`  -d, --daemon          Run in background as detached daemon`);
   log(`  -C, --dir <path>      Specify workspace directory (defaults to current dir)`);
+  log(`  --channel <name>      Communication channel: telegram (default), console`);
+  log(`  --engine <name>       AI coding engine: opencode (default), shell, claude, aider`);
   log(`  -v, --version         Display AgentGram version\n`);
   log(`Examples:`);
   log(`  agentgram init`);
   log(`  agentgram start`);
+  log(`  agentgram start --channel console --engine shell`);
   log(`  agentgram start --daemon --dir /path/to/project`);
   log(`  agentgram service install\n`);
 }

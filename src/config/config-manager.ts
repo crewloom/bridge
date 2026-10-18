@@ -101,6 +101,8 @@ export class ConfigManager {
       dailyLimit: 200,
       runTimeout: 30 * 60,
       language: 'en',
+      channel: 'telegram',
+      engine: 'opencode',
       denyPatterns: [],
       allowedPaths: [],
       workspaces: [resolvedTarget],
@@ -157,6 +159,12 @@ export class ConfigManager {
       process.env.RUMUZE_EDIT_MODEL ||
       process.env.TGBRIDGE_MODEL;
     if (envModel) this.config.defaultModel = envModel.trim();
+
+    const envChannel = process.env.AGENTGRAM_CHANNEL;
+    if (envChannel) this.config.channel = envChannel.trim();
+
+    const envEngine = process.env.AGENTGRAM_ENGINE;
+    if (envEngine) this.config.engine = envEngine.trim();
   }
 
   public merge(data: Record<string, unknown>): void {
@@ -164,6 +172,8 @@ export class ConfigManager {
     if (typeof data.allowed_chat_id === 'string') this.config.allowedChatId = String(data.allowed_chat_id).trim();
     if (typeof data.default_agent === 'string') this.config.defaultAgent = data.default_agent.trim();
     if (typeof data.default_model === 'string') this.config.defaultModel = data.default_model.trim();
+    if (typeof data.channel === 'string') this.config.channel = data.channel.trim();
+    if (typeof data.engine === 'string') this.config.engine = data.engine.trim();
     if (Array.isArray(data.favorite_models)) this.config.favoriteModels = data.favorite_models.map(String);
     if (typeof data.daily_limit === 'number') this.config.dailyLimit = data.daily_limit;
     if (typeof data.run_timeout === 'number') this.config.runTimeout = data.run_timeout;
@@ -185,6 +195,8 @@ export class ConfigManager {
     const payload = {
       bot_token: this.config.botToken,
       allowed_chat_id: this.config.allowedChatId,
+      channel: this.config.channel || 'telegram',
+      engine: this.config.engine || 'opencode',
       default_agent: this.config.defaultAgent,
       default_model: this.config.defaultModel,
       favorite_models: this.config.favoriteModels,
@@ -207,6 +219,8 @@ export class ConfigManager {
     const payload = {
       bot_token: this.config.botToken,
       allowed_chat_id: this.config.allowedChatId,
+      channel: this.config.channel || 'telegram',
+      engine: this.config.engine || 'opencode',
       default_agent: this.config.defaultAgent,
       default_model: this.config.defaultModel,
       favorite_models: this.config.favoriteModels,
@@ -234,10 +248,11 @@ export class ConfigManager {
 
   public validate(): string[] {
     const errors: string[] = [];
-    if (!this.config.botToken) {
+    const isTelegram = !this.config.channel || this.config.channel === 'telegram';
+    if (isTelegram && !this.config.botToken) {
       errors.push('Telegram Bot Token is missing. Run `agentgram init` or set AGENTGRAM_BOT_TOKEN.');
     }
-    if (!this.config.allowedChatId) {
+    if (isTelegram && !this.config.allowedChatId) {
       errors.push('Allowed Chat ID is missing. Run `agentgram init` to pair your Telegram chat.');
     }
     if (!fs.existsSync(this.config.targetDir)) {

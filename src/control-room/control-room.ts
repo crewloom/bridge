@@ -1,20 +1,32 @@
 /**
  * AgentGram Control Room State Machine & Mission Control
- * Pure Node.js with TypeScript clean architecture.
+ * Decoupled Hexagonal Architecture consuming pluggable IChannelAdapter and IAgentEngine.
+ * Pure Node.js with TypeScript clean architecture and zero external dependencies.
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { TelegramClient, escapeHtml } from '../telegram/telegram-client.js';
 import { OpenCodeClient, type OpenCodeEvent } from '../opencode/opencode-client.js';
+import { TelegramChannelAdapter } from '../channels/telegram.adapter.js';
+import { OpenCodeAdapter } from '../engines/opencode.adapter.js';
+import type {
+  IChannelAdapter,
+  ChannelKeyboard,
+  IncomingChannelMessage,
+  IncomingChannelAction,
+} from '../channels/channel.interface.js';
+import type {
+  IAgentEngine,
+  AgentEngineEvent,
+} from '../engines/engine.interface.js';
 import { SecurityPolicy } from '../security/policy.js';
 import { ConfigManager } from '../config/config-manager.js';
-import { t, type TranslationKey } from '../i18n/index.js';
+import { t } from '../i18n/index.js';
 import type {
   ExecutionMode,
   InlineKeyboardMarkup,
+  InlineKeyboardButton,
   OpenCodeRun,
-  TelegramMessage,
-  TelegramUpdate,
 } from '../domain/types.js';
 
 export const SYSTEM_HEADER = (targetDir: string) => `
@@ -70,27 +82,45 @@ export function decidePermission(
   return { decision: 'ask' };
 }
 
-export function permissionKeyboard(permId: string, lang: 'en' | 'ar' = 'en'): InlineKeyboardMarkup {
-  return {
-    inline_keyboard: [
-      [
-        { text: t('perm_allow_once', lang), callback_data: `pm:o:${permId}` },
-        { text: t('perm_always_allow', lang), callback_data: `pm:a:${permId}` },
-      ],
-      [
-        { text: t('perm_reject', lang), callback_data: `pm:r:${permId}` },
-        { text: t('perm_stop_session', lang), callback_data: 'stop' },
-      ],
-      [
-        { text: t('btn_help', lang), callback_data: 'hp' },
-      ],
+export function permissionKeyboard(
+  permId: string,
+  lang: 'en' | 'ar' = 'en'
+): ChannelKeyboard & InlineKeyboardMarkup {
+  const rows: InlineKeyboardButton[][] = [
+    [
+      { text: t('perm_allow_once', lang), callback_data: `pm:o:${permId}` },
+      { text: t('perm_always_allow', lang), callback_data: `pm:a:${permId}` },
     ],
-  };
+    [
+      { text: t('perm_reject', lang), callback_data: `pm:r:${permId}` },
+      { text: t('perm_stop_session', lang), callback_data: 'stop' },
+    ],
+    [
+      { text: t('btn_help', lang), callback_data: 'hp' },
+    ],
+  ];
+
+  return {
+    rows: rows.map((r) =>
+      r.map((btn) => ({
+        text: btn.text,
+        callbackData: btn.callback_data,
+        callback_data: btn.callback_data,
+      }))
+    ),
+    inline_keyboard: rows,
+  } as ChannelKeyboard & InlineKeyboardMarkup;
+}
+
+export interface ControlRoomOptions {
+  channel: IChannelAdapter;
+  engine: IAgentEngine;
+  configManager: ConfigManager;
 }
 
 export class ControlRoom {
-  public readonly tg: TelegramClient;
-  public oc: OpenCodeClient;
+  public readonly channel: IChannelAdapter;
+  public engine: IAgentEngine;
   public readonly cfgManager: ConfigManager;
   public policy: SecurityPolicy;
   public readonly allowedChatId: string;
@@ -102,23 +132,33 @@ export class ControlRoom {
 
   private activeRun: OpenCodeRun | null = null;
   private alwaysAllowedPerms: Set<string> = new Set();
-  private missionCardMsgId: number | null = null;
+  private missionCardMsgId: string | number | null = null;
   private updateTimer: NodeJS.Timeout | null = null;
-  private isPolling = false;
+  private isListening = false;
 
+  // Polymorphic Constructor: supports either options object or legacy 3-arguments
+  constructor(options: ControlRoomOptions);
+  constructor(tg: TelegramClient, oc: OpenCodeClient, cfgManager: ConfigManager);
   constructor(
-    tg: TelegramClient,
-    oc: OpenCodeClient,
-    cfgManager: ConfigManager
+    arg1: ControlRoomOptions | TelegramClient,
+    arg2?: OpenCodeClient,
+    arg3?: ConfigManager
   ) {
-    this.tg = tg;
-    this.oc = oc;
-    this.cfgManager = cfgManager;
-    this.allowedChatId = cfgManager.config.allowedChatId;
-    this.targetDir = cfgManager.config.targetDir;
-    this.currentAgent = cfgManager.config.defaultAgent;
-    this.currentModel = cfgManager.config.defaultModel;
-    this.language = cfgManager.config.language;
+    if ('channel' in arg1 && 'engine' in arg1) {
+      this.channel = arg1.channel;
+      this.engine = arg1.engine;
+      this.cfgManager = arg1.configManager;
+    } else {
+      this.channel = new TelegramChannelAdapter(arg1 as TelegramClient);
+      this.engine = new OpenCodeAdapter(arg2 as OpenCodeClient);
+      this.cfgManager = arg3 as ConfigManager;
+    }
+
+    this.allowedChatId = this.cfgManager.config.allowedChatId;
+    this.targetDir = this.cfgManager.config.targetDir;
+    this.currentAgent = this.cfgManager.config.defaultAgent;
+    this.currentModel = this.cfgManager.config.defaultModel;
+    this.language = this.cfgManager.config.language;
 
     this.policy = new SecurityPolicy(
       this.targetDir,
@@ -126,74 +166,85 @@ export class ControlRoom {
       this.cfgManager.config.allowedPaths
     );
 
-    this.setupOpenCodeEvents();
+    this.setupEngineEvents();
   }
 
-  private setupOpenCodeEvents(): void {
-    this.oc.on('event', (event: OpenCodeEvent) => {
-      this.handleOpenCodeEvent(event).catch(console.error);
+  // Backward compatibility getters
+  public get tg(): TelegramClient {
+    if (this.channel instanceof TelegramChannelAdapter) {
+      return this.channel.client;
+    }
+    return new TelegramClient(this.cfgManager.config.botToken);
+  }
+
+  public get oc(): OpenCodeClient {
+    if (this.engine instanceof OpenCodeAdapter) {
+      return this.engine.client;
+    }
+    return new OpenCodeClient('http://127.0.0.1:4096', undefined, this.targetDir);
+  }
+
+  public set oc(client: OpenCodeClient) {
+    if (this.engine instanceof OpenCodeAdapter) {
+      this.engine.client = client;
+    } else {
+      this.engine = new OpenCodeAdapter(client, this.targetDir);
+      this.setupEngineEvents();
+    }
+  }
+
+  private setupEngineEvents(): void {
+    this.engine.on('event', (event: AgentEngineEvent) => {
+      this.handleEngineEvent(event).catch(console.error);
     });
   }
 
   public async start(): Promise<void> {
-    this.oc.connectEventStream();
-    this.isPolling = true;
+    await this.engine.connect();
+    this.isListening = true;
 
-    await this.tg.sendMessage(
+    await this.channel.sendMessage(
       this.allowedChatId,
       t('welcome', this.language, { target: escapeHtml(this.targetDir) }),
       { replyMarkup: this.getMainKeyboard() }
     );
 
-    this.runPollingLoop().catch(console.error);
+    await this.channel.startListening({
+      onMessage: async (msg: IncomingChannelMessage) => {
+        if (this.channel.id === 'telegram' && this.allowedChatId && msg.chatId !== this.allowedChatId) {
+          return;
+        }
+        await this.handleUserMessage(msg);
+      },
+      onAction: async (action: IncomingChannelAction) => {
+        if (this.channel.id === 'telegram' && this.allowedChatId && action.senderId !== this.allowedChatId) {
+          return;
+        }
+        await this.handleCallback(action.id, action.actionData, action.messageId);
+      },
+      onError: (err: Error) => {
+        console.error('Channel error:', err.message);
+      },
+    });
   }
 
   public stop(): void {
-    this.isPolling = false;
-    this.oc.disconnectEventStream();
+    this.isListening = false;
+    this.channel.stopListening();
+    this.engine.disconnect();
     if (this.updateTimer) {
       clearInterval(this.updateTimer);
       this.updateTimer = null;
     }
   }
 
-  private async runPollingLoop(): Promise<void> {
-    let offset = 0;
-    while (this.isPolling) {
-      try {
-        const updates = await this.tg.getUpdates(offset, 25);
-        for (const update of updates) {
-          offset = update.update_id + 1;
-          await this.handleTelegramUpdate(update);
-        }
-      } catch (err) {
-        await new Promise((r) => setTimeout(r, 2000));
-      }
-    }
-  }
-
-  private async handleTelegramUpdate(update: TelegramUpdate): Promise<void> {
-    if (update.callback_query) {
-      const cb = update.callback_query;
-      if (String(cb.from.id) !== this.allowedChatId) return;
-      await this.handleCallback(cb.id, cb.data || '', cb.message);
-      return;
-    }
-
-    if (update.message) {
-      const msg = update.message;
-      if (String(msg.chat.id) !== this.allowedChatId) return;
-      await this.handleUserMessage(msg);
-    }
-  }
-
-  private async handleUserMessage(msg: TelegramMessage): Promise<void> {
-    const text = (msg.text || msg.caption || '').trim();
+  private async handleUserMessage(msg: IncomingChannelMessage): Promise<void> {
+    const text = (msg.text || '').trim();
     if (!text) return;
 
     // Commands
     if (text === '/start' || text === '/help') {
-      await this.tg.sendMessage(
+      await this.channel.sendMessage(
         this.allowedChatId,
         `⚡ <b>AgentGram v2.0.0</b>\n${t('help_title', this.language)}`,
         { replyMarkup: this.getMainKeyboard() }
@@ -226,21 +277,21 @@ export class ControlRoom {
       this.language = this.language === 'en' ? 'ar' : 'en';
       this.cfgManager.config.language = this.language;
       this.cfgManager.saveGlobal();
-      await this.tg.sendMessage(this.allowedChatId, t('lang_changed', this.language), {
+      await this.channel.sendMessage(this.allowedChatId, t('lang_changed', this.language), {
         replyMarkup: this.getMainKeyboard(),
       });
       return;
     }
 
     // Submit Task Prompt
-    await this.guardedSubmit(text, msg.message_id);
+    await this.guardedSubmit(text, msg.id);
   }
 
-  public async guardedSubmit(promptText: string, replyToMsgId?: number): Promise<void> {
+  public async guardedSubmit(promptText: string, replyToMsgId?: string | number): Promise<void> {
     // 1. Check Policy Deny
     const hits = this.policy.checkCommand(promptText);
     if (hits.length > 0) {
-      await this.tg.sendMessage(
+      await this.channel.sendMessage(
         this.allowedChatId,
         t('policy_denied', this.language, { hits: escapeHtml(hits.slice(0, 3).join(', ')) })
       );
@@ -250,7 +301,7 @@ export class ControlRoom {
     // 2. Check Prompt Injection Defense
     const detection = this.policy.checkPrompt(promptText);
     if (detection.blocked) {
-      await this.tg.sendMessage(
+      await this.channel.sendMessage(
         this.allowedChatId,
         t('prompt_injection_blocked', this.language, {
           reason: escapeHtml(detection.reason),
@@ -262,13 +313,13 @@ export class ControlRoom {
 
     // 3. Busy check
     if (this.activeRun && this.activeRun.busy) {
-      await this.tg.sendMessage(this.allowedChatId, t('room_busy', this.language));
+      await this.channel.sendMessage(this.allowedChatId, t('room_busy', this.language));
       return;
     }
 
     try {
       // Create session or reuse
-      const session = await this.oc.createSession();
+      const session = await this.engine.createSession({ workspaceDir: this.targetDir });
       const sessionId = session.id;
 
       this.activeRun = {
@@ -277,7 +328,7 @@ export class ControlRoom {
         model: this.currentModel,
         mode: this.currentMode,
         startedAt: Date.now(),
-        userMsgId: replyToMsgId,
+        userMsgId: typeof replyToMsgId === 'number' ? replyToMsgId : undefined,
         userMessages: new Set([promptText]),
         text: {},
         textOrder: [],
@@ -291,7 +342,7 @@ export class ControlRoom {
       };
 
       // Create initial mission card
-      const cardMsg = await this.tg.sendMessage(
+      const cardMsg = await this.channel.sendMessage(
         this.allowedChatId,
         this.renderMissionCardText(),
         {
@@ -299,31 +350,31 @@ export class ControlRoom {
           replyMarkup: this.getMainKeyboard(),
         }
       );
-      this.missionCardMsgId = cardMsg.message_id;
+      this.missionCardMsgId = cardMsg.messageId;
 
       // Start periodic refresh
       this.startMissionCardTicker();
 
-      // Submit prompt to OpenCode engine
+      // Submit prompt to Agent Engine
       const sanitized = this.policy.sanitizePrompt(promptText);
-      await this.oc.submitPrompt(sessionId, sanitized, this.currentAgent, this.currentModel);
+      await this.engine.submitPrompt(sessionId, sanitized, this.currentAgent, this.currentModel);
     } catch (err) {
-      await this.tg.sendMessage(
+      await this.channel.sendMessage(
         this.allowedChatId,
         `❌ Error: ${escapeHtml((err as Error).message)}`
       );
     }
   }
 
-  private async handleCallback(cbId: string, data: string, msg?: TelegramMessage): Promise<void> {
-    await this.tg.answerCallbackQuery(cbId);
+  private async handleCallback(cbId: string, data: string, messageId?: string | number): Promise<void> {
+    await this.channel.answerAction(cbId);
 
     // Permission callbacks
     if (data.startsWith('pm:o:')) {
       const permId = data.slice(5);
-      await this.oc.replyPermission(permId, 'allow');
-      if (msg) {
-        await this.tg.sendMessage(this.allowedChatId, t('permission_allowed_once', this.language, { tool: permId }));
+      await this.engine.replyPermission(permId, 'allow');
+      if (messageId !== undefined) {
+        await this.channel.sendMessage(this.allowedChatId, t('permission_allowed_once', this.language, { tool: permId }));
       }
       return;
     }
@@ -331,18 +382,18 @@ export class ControlRoom {
     if (data.startsWith('pm:a:')) {
       const permId = data.slice(5);
       this.alwaysAllowedPerms.add(permId);
-      await this.oc.replyPermission(permId, 'allow');
-      if (msg) {
-        await this.tg.sendMessage(this.allowedChatId, t('permission_always_allowed', this.language, { tool: permId }));
+      await this.engine.replyPermission(permId, 'allow');
+      if (messageId !== undefined) {
+        await this.channel.sendMessage(this.allowedChatId, t('permission_always_allowed', this.language, { tool: permId }));
       }
       return;
     }
 
     if (data.startsWith('pm:r:')) {
       const permId = data.slice(5);
-      await this.oc.replyPermission(permId, 'reject');
-      if (msg) {
-        await this.tg.sendMessage(this.allowedChatId, t('permission_rejected', this.language, { tool: permId }));
+      await this.engine.replyPermission(permId, 'reject');
+      if (messageId !== undefined) {
+        await this.channel.sendMessage(this.allowedChatId, t('permission_rejected', this.language, { tool: permId }));
       }
       return;
     }
@@ -352,8 +403,8 @@ export class ControlRoom {
       const mode = data.slice(3) as ExecutionMode;
       if (['read', 'build', 'auto'].includes(mode)) {
         this.currentMode = mode;
-        if (msg) {
-          await this.tg.sendMessage(
+        if (messageId !== undefined) {
+          await this.channel.sendMessage(
             this.allowedChatId,
             `🔒 Mode changed to: <b>${mode}</b>`
           );
@@ -393,7 +444,7 @@ export class ControlRoom {
     }
   }
 
-  private async handleOpenCodeEvent(event: OpenCodeEvent): Promise<void> {
+  private async handleEngineEvent(event: AgentEngineEvent): Promise<void> {
     if (!this.activeRun) return;
 
     const type = event.type;
@@ -409,21 +460,21 @@ export class ControlRoom {
       const { decision, reason } = decidePermission(props, this.currentMode, this.policy);
 
       if (this.alwaysAllowedPerms.has(permId) || decision === 'allow') {
-        await this.oc.replyPermission(permId, 'allow');
+        await this.engine.replyPermission(permId, 'allow');
         return;
       }
 
       if (decision === 'reject') {
-        await this.oc.replyPermission(permId, 'reject');
+        await this.engine.replyPermission(permId, 'reject');
         if (reason) {
-          await this.tg.sendMessage(this.allowedChatId, `⛔ ${escapeHtml(reason)}`);
+          await this.channel.sendMessage(this.allowedChatId, `⛔ ${escapeHtml(reason)}`);
         }
         return;
       }
 
       const kb = permissionKeyboard(permId, this.language);
 
-      await this.tg.sendMessage(
+      await this.channel.sendMessage(
         this.allowedChatId,
         t('permission_prompt', this.language, {
           tool: escapeHtml(tool),
@@ -476,7 +527,8 @@ export class ControlRoom {
 
     return `
 ⚡ <b>AgentGram · Live Mission Control</b>
-Agent: 🧠 <code>${escapeHtml(run.agent)}</code> | Mode: 🔒 <b>${run.mode}</b>
+Agent: 🧠 <code>${escapeHtml(run.agent)}</code> (${escapeHtml(this.engine.name)}) | Mode: 🔒 <b>${run.mode}</b>
+Channel: 📡 <b>${escapeHtml(this.channel.name)}</b>
 Status: ${statusIcon} <b>${statusText}</b> · ⏳ ${elapsed}s
 Commands: ⚙️ ${run.cmds} · Files: 📝 ${run.files.size}
 Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
@@ -492,7 +544,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     }
 
     try {
-      await this.tg.editMessageText(
+      await this.channel.editMessage(
         this.allowedChatId,
         this.missionCardMsgId,
         this.renderMissionCardText(),
@@ -501,33 +553,47 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     } catch {}
   }
 
-  public getMainKeyboard(): InlineKeyboardMarkup {
-    return {
-      inline_keyboard: [
-        [
-          { text: t('btn_stop', this.language), callback_data: 'stop' },
-          { text: t('btn_diff', this.language), callback_data: 'diff' },
-          { text: t('btn_mode', this.language), callback_data: 'menu:mo' },
-        ],
-        [
-          { text: t('btn_workspaces', this.language), callback_data: 'menu:ws' },
-          { text: t('btn_language', this.language), callback_data: 'menu:lg' },
-        ],
+  public getMainKeyboard(): ChannelKeyboard & InlineKeyboardMarkup {
+    const rows: InlineKeyboardButton[][] = [
+      [
+        { text: t('btn_stop', this.language), callback_data: 'stop' },
+        { text: t('btn_diff', this.language), callback_data: 'diff' },
+        { text: t('btn_mode', this.language), callback_data: 'menu:mo' },
       ],
-    };
+      [
+        { text: t('btn_workspaces', this.language), callback_data: 'menu:ws' },
+        { text: t('btn_language', this.language), callback_data: 'menu:lg' },
+      ],
+    ];
+
+    return {
+      rows: rows.map((r) =>
+        r.map((btn) => ({
+          text: btn.text,
+          callbackData: btn.callback_data,
+          callback_data: btn.callback_data,
+        }))
+      ),
+      inline_keyboard: rows,
+    } as ChannelKeyboard & InlineKeyboardMarkup;
   }
 
   private async sendModeMenu(): Promise<void> {
-    const kb: InlineKeyboardMarkup = {
-      inline_keyboard: [
-        [
-          { text: '🔒 Read-Only', callback_data: 'mo:read' },
-          { text: '🔨 Build (Interactive)', callback_data: 'mo:build' },
-          { text: '⚡ Auto Mode', callback_data: 'mo:auto' },
-        ],
+    const rows: InlineKeyboardButton[][] = [
+      [
+        { text: '🔒 Read-Only', callback_data: 'mo:read' },
+        { text: '🔨 Build (Interactive)', callback_data: 'mo:build' },
+        { text: '⚡ Auto Mode', callback_data: 'mo:auto' },
       ],
+    ];
+    const kb: ChannelKeyboard & InlineKeyboardMarkup = {
+      rows: rows.map((r) =>
+        r.map((b) => ({ text: b.text, callbackData: b.callback_data, callback_data: b.callback_data }))
+      ),
+      inline_keyboard: rows,
     };
-    await this.tg.sendMessage(
+
+    await this.channel.sendMessage(
       this.allowedChatId,
       t('select_mode', this.language, { mode: this.currentMode }),
       { replyMarkup: kb }
@@ -536,24 +602,31 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
 
   private async sendWorkspaceMenu(): Promise<void> {
     const workspaces = this.cfgManager.config.workspaces;
-    const buttons = workspaces.map((ws, i) => [
+    const rows: InlineKeyboardButton[][] = workspaces.map((ws, i) => [
       {
         text: `${ws === this.targetDir ? '👉 ' : ''}${path.basename(ws)}`,
         callback_data: `ws:${i}`,
       },
     ]);
 
-    await this.tg.sendMessage(
+    const kb: ChannelKeyboard & InlineKeyboardMarkup = {
+      rows: rows.map((r) =>
+        r.map((b) => ({ text: b.text, callbackData: b.callback_data, callback_data: b.callback_data }))
+      ),
+      inline_keyboard: rows,
+    };
+
+    await this.channel.sendMessage(
       this.allowedChatId,
       t('select_workspace', this.language, { ws: escapeHtml(this.targetDir) }),
-      { replyMarkup: { inline_keyboard: buttons } }
+      { replyMarkup: kb }
     );
   }
 
   public async switchWorkspace(newPath: string): Promise<void> {
     const resolved = path.resolve(newPath);
     if (!fs.existsSync(resolved)) {
-      await this.tg.sendMessage(
+      await this.channel.sendMessage(
         this.allowedChatId,
         t('ws_not_found', this.language, { path: escapeHtml(resolved) })
       );
@@ -561,7 +634,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     }
 
     if (this.activeRun && this.activeRun.busy) {
-      await this.tg.sendMessage(
+      await this.channel.sendMessage(
         this.allowedChatId,
         t('ws_busy', this.language, { ws: escapeHtml(this.targetDir) })
       );
@@ -576,13 +649,10 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       this.cfgManager.config.allowedPaths
     );
 
-    // Reconnect OpenCode engine for the new workspace
-    this.oc.disconnectEventStream();
-    this.oc = new OpenCodeClient(this.oc.baseUrl, undefined, this.targetDir);
-    this.setupOpenCodeEvents();
-    this.oc.connectEventStream();
+    // Switch workspace in the active agent engine
+    await this.engine.setWorkspace(this.targetDir);
 
-    await this.tg.sendMessage(
+    await this.channel.sendMessage(
       this.allowedChatId,
       t('ws_changed', this.language, {
         name: escapeHtml(path.basename(resolved)),
@@ -596,24 +666,24 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
 
   public async sendDiff(): Promise<void> {
     try {
-      const diff = await this.oc.getDiff();
+      const diff = await this.engine.getDiff();
       if (!diff || !diff.trim()) {
-        await this.tg.sendMessage(this.allowedChatId, '📄 <i>No local changes (working tree clean).</i>');
+        await this.channel.sendMessage(this.allowedChatId, '📄 <i>No local changes (working tree clean).</i>');
         return;
       }
       const preview = diff.length <= 3500 ? diff : diff.slice(0, 3500) + '\n… (truncated)';
-      await this.tg.sendMessage(this.allowedChatId, `<pre><code>${escapeHtml(preview)}</code></pre>`);
+      await this.channel.sendMessage(this.allowedChatId, `<pre><code>${escapeHtml(preview)}</code></pre>`);
     } catch (err) {
-      await this.tg.sendMessage(this.allowedChatId, `❌ Diff error: ${(err as Error).message}`);
+      await this.channel.sendMessage(this.allowedChatId, `❌ Diff error: ${(err as Error).message}`);
     }
   }
 
   public async abortCurrentRun(): Promise<void> {
     if (this.activeRun && this.activeRun.sessionId) {
-      await this.oc.abortSession(this.activeRun.sessionId);
+      await this.engine.abortSession(this.activeRun.sessionId);
       this.activeRun.busy = false;
       this.activeRun.done = true;
-      await this.tg.sendMessage(this.allowedChatId, t('room_stopped', this.language));
+      await this.channel.sendMessage(this.allowedChatId, t('room_stopped', this.language));
       await this.updateMissionCard(true);
     }
   }

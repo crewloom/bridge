@@ -1,0 +1,92 @@
+/**
+ * AgentGram Pluggable Communication Channel Contract
+ * Hexagonal architecture port for messaging and interaction channels (Telegram, Console, Slack, Discord, Webhook, etc.)
+ * Pure Node.js with zero runtime dependencies.
+ */
+
+export interface ChannelButton {
+  text: string;
+  callbackData?: string;
+  url?: string;
+}
+
+export interface ChannelKeyboard {
+  rows: ChannelButton[][];
+}
+
+export interface ChannelSendOptions {
+  replyMarkup?: ChannelKeyboard;
+  replyToMessageId?: string | number;
+  parseMode?: 'HTML' | 'Markdown' | 'None';
+  disableWebPagePreview?: boolean;
+}
+
+export interface ChannelMessageResult {
+  messageId: string | number;
+  chatId: string;
+  timestamp: number;
+}
+
+export interface IncomingChannelMessage {
+  id: string | number;
+  senderId: string;
+  chatId: string;
+  text: string;
+  timestamp: number;
+  replyToMessageId?: string | number;
+  raw?: unknown;
+}
+
+export interface IncomingChannelAction {
+  id: string;
+  senderId: string;
+  chatId: string;
+  actionData: string;
+  messageId?: string | number;
+  raw?: unknown;
+}
+
+export interface ChannelUpdateHandler {
+  onMessage(msg: IncomingChannelMessage): Promise<void>;
+  onAction(action: IncomingChannelAction): Promise<void>;
+  onError?(err: Error): void;
+}
+
+export interface IChannelAdapter {
+  readonly id: string;
+  readonly name: string;
+
+  /**
+   * Start listening for incoming user messages and interactive actions.
+   */
+  startListening(handler: ChannelUpdateHandler): Promise<void>;
+
+  /**
+   * Stop listening / close active polling or connection.
+   */
+  stopListening(): Promise<void> | void;
+
+  /**
+   * Send a message to the target recipient/channel.
+   */
+  sendMessage(
+    recipientId: string,
+    text: string,
+    options?: ChannelSendOptions
+  ): Promise<ChannelMessageResult>;
+
+  /**
+   * Edit an existing message in-place.
+   */
+  editMessage(
+    recipientId: string,
+    messageId: string | number,
+    text: string,
+    options?: ChannelSendOptions
+  ): Promise<void>;
+
+  /**
+   * Acknowledge or answer an interactive action / callback.
+   */
+  answerAction(actionId: string, text?: string): Promise<void>;
+}

@@ -20,6 +20,12 @@ export {
   LEGACY_CONFIG_DIR,
 } from './config/config-manager.js';
 
+// Re-export Communication Channels (Telegram, Console, Custom)
+export * from './channels/index.js';
+
+// Re-export AI Coding Engines (OpenCode, Shell/Claude/Aider, Custom)
+export * from './engines/index.js';
+
 // Re-export Telegram Bot Client
 export { TelegramClient, escapeHtml } from './telegram/telegram-client.js';
 
