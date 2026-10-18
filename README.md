@@ -16,7 +16,7 @@
 <p align="center">
   <a href="https://www.npmjs.com/package/rumuze-edit"><b>📦 View on NPM</b></a> •
   <a href="https://packagist.org/packages/rumuze/edit"><b>🐘 View on Packagist</b></a> •
-  <a href="https://github.com/rumuze/rumuze-edit/releases/latest"><b>🏷️ Release Notes (v1.0.2)</b></a> •
+  <a href="https://github.com/rumuze/rumuze-edit/releases/latest"><b>🏷️ Release Notes (v1.0.3)</b></a> •
   <a href="#-quick-start"><b>🚀 Quick Start</b></a> •
   <a href="#-frequently-asked-questions-faq"><b>❓ FAQ</b></a>
 </p>

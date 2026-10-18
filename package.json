@@ -1,6 +1,6 @@
 {
   "name": "rumuze-edit",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Control OpenCode and AI coding agents on your machine directly from Telegram with live streaming cards, interactive buttons, and security sandboxing.",
   "main": "bin/rumuze-edit.js",
   "bin": {

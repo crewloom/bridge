@@ -8,13 +8,18 @@ attachments via getFile, and writes an audit log.
 
 Zero external dependencies (stdlib only).
 """
+import http.client
+import io
 import json
 import os
 import re
 import signal
+import ssl
 import subprocess
 import sys
+import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date, datetime, timezone
@@ -62,14 +67,71 @@ def log(event, cfg=None, **kw):
         pass
 
 
-def api(token, method, params=None, timeout=30):
+_LOCAL_SESSION = threading.local()
+_SSL_CTX = None
+
+
+def _get_tg_connection(timeout):
+    global _SSL_CTX
+    if _SSL_CTX is None:
+        _SSL_CTX = ssl.create_default_context()
+    conn = getattr(_LOCAL_SESSION, "conn", None)
+    if conn is None:
+        conn = http.client.HTTPSConnection("api.telegram.org", port=443, context=_SSL_CTX, timeout=timeout)
+        _LOCAL_SESSION.conn = conn
+    return conn
+
+
+def _close_tg_connection():
+    conn = getattr(_LOCAL_SESSION, "conn", None)
+    if conn is not None:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        _LOCAL_SESSION.conn = None
+
+
+def api(token, method, params=None, timeout=30, max_retries=3):
     url = f"https://api.telegram.org/bot{token}/{method}"
-    data = None
-    if params:
-        data = urllib.parse.urlencode(params).encode()
-    req = urllib.request.Request(url, data=data)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode("utf-8"))
+    body = urllib.parse.urlencode(params).encode("utf-8") if params else None
+    headers = {
+        "User-Agent": "RumuzeEdit/1.0",
+        "Connection": "keep-alive"
+    }
+    if body:
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+    path = f"/bot{token}/{method}"
+    last_exc = None
+
+    for attempt in range(max_retries):
+        try:
+            conn = _get_tg_connection(timeout)
+            conn.request("POST" if body else "GET", path, body=body, headers=headers)
+            resp = conn.getresponse()
+            raw = resp.read()
+
+            if resp.status >= 400:
+                if resp.status in (502, 503, 504) and attempt < max_retries - 1:
+                    _close_tg_connection()
+                    time.sleep(0.3 * (attempt + 1))
+                    continue
+                fp = io.BytesIO(raw)
+                raise urllib.error.HTTPError(url, resp.status, resp.reason, resp.headers, fp)
+
+            return json.loads(raw.decode("utf-8"))
+        except urllib.error.HTTPError:
+            raise
+        except Exception as e:
+            _close_tg_connection()
+            last_exc = e
+            if attempt < max_retries - 1:
+                time.sleep(0.2 * (attempt + 1))
+                continue
+            raise urllib.error.URLError(e)
+    if last_exc:
+        raise urllib.error.URLError(last_exc)
 
 
 def load_token(cfg=None):

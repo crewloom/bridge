@@ -602,12 +602,21 @@ class OpenCode:
         quoted_dir = urllib.parse.quote(self.directory, safe="")
         return f"{self.base}{path}{sep}directory={quoted_dir}"
 
-    def call(self, path, method="GET", body=None, timeout=30):
+    def call(self, path, method="GET", body=None, timeout=30, max_retries=2):
         data = json.dumps(body).encode() if body is not None else None
-        req = urllib.request.Request(self._url(path), data=data, headers=self.headers, method=method)
-        with urllib.request.urlopen(req, timeout=timeout) as r:
-            raw = r.read().decode("utf-8")
-        return json.loads(raw) if raw.strip() else None
+        last_exc = None
+        for attempt in range(max_retries):
+            try:
+                req = urllib.request.Request(self._url(path), data=data, headers=self.headers, method=method)
+                with urllib.request.urlopen(req, timeout=timeout) as r:
+                    raw = r.read().decode("utf-8")
+                return json.loads(raw) if raw.strip() else None
+            except Exception as e:
+                last_exc = e
+                if attempt < max_retries - 1:
+                    time.sleep(0.2)
+                    continue
+                raise last_exc
 
     def events(self):
         """Yield decoded SSE events; raises on connection loss."""
