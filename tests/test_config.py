@@ -15,6 +15,7 @@ class TestConfig(unittest.TestCase):
     def test_config_defaults(self):
         cfg = Config(target_dir=tempfile.gettempdir())
         self.assertEqual(cfg.default_agent, "build")
+        self.assertEqual(cfg.language, "en")
         self.assertGreaterEqual(cfg.daily_limit, 50)
         self.assertIn("opencode/space-bunny-free", cfg.favorite_models)
 

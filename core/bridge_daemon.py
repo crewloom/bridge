@@ -30,8 +30,8 @@ TMP_DIR = "/tmp/rumuze_edit"
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b\][^\x07]*\x07|\r")
 MODEL_RE = re.compile(r"^/m\s+([A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+)[\s\n]+(.*)$", re.DOTALL)
 SYNC_RE = re.compile(
-    r"(اسحب|حدث|حدّث|مزامنة|زامن|sync|pull).*(تحديث|GitHub|الجتهب|جيت|origin|main|master|dev)"
-    r"|^(sync|اسحب التحديثات)\s*$",
+    r"(sync|pull).*(update|github|origin|main|master|dev)"
+    r"|^(sync|pull updates)\s*$",
     re.IGNORECASE)
 
 CURRENT_CFG = None

@@ -67,6 +67,7 @@ class Config:
         ]
         self.daily_limit = 200
         self.run_timeout = 30 * 60
+        self.language = "en"
         self.deny_patterns = []
         self.extra = {}
 
@@ -148,6 +149,8 @@ class Config:
             self.daily_limit = data["daily_limit"]
         if "run_timeout" in data and isinstance(data["run_timeout"], int):
             self.run_timeout = data["run_timeout"]
+        if "language" in data and data["language"]:
+            self.language = str(data["language"]).strip().lower()
         if "deny_patterns" in data and isinstance(data["deny_patterns"], list):
             self.deny_patterns = [str(p) for p in data["deny_patterns"]]
         if "extra" in data and isinstance(data["extra"], dict):
@@ -159,6 +162,7 @@ class Config:
         payload = {
             "bot_token": self.bot_token,
             "allowed_chat_id": self.allowed_chat_id,
+            "language": self.language,
             "default_agent": self.default_agent,
             "default_model": self.default_model,
             "favorite_models": self.favorite_models,

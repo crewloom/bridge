@@ -41,9 +41,11 @@ sys.path.insert(0, BRIDGE_DIR)
 try:
     from core.config import Config
     from core.policy import SecurityPolicy
+    from core.i18n import t
 except ImportError:
     from config import Config
     from policy import SecurityPolicy
+    from i18n import t
 import bridge_daemon as legacy
 
 CFG = Config()
@@ -335,7 +337,7 @@ def human_delta(seconds):
     seconds = max(0, int(seconds))
     h, rem = divmod(seconds, 3600)
     m = rem // 60
-    return (f"{h}س " if h else "") + f"{m}د"
+    return (f"{h}h " if h else "") + f"{m}m"
 
 
 def retry_time(next_ms):
@@ -349,18 +351,18 @@ def retry_time(next_ms):
 def retry_notice(info):
     when = retry_time(info.get("next"))
     if info.get("reason") == "free_tier_limit":
-        head = ("⛔ <b>الحد المجاني خلص</b>\n"
-                "المزوّد (OpenCode Zen) رفض الطلب: «%s». الموديل المجاني مش هيشتغل لحد التجديد%s."
+        head = ("⛔ <b>Free tier limit reached</b>\n"
+                "The provider (OpenCode Zen) rejected request: «%s». Free models are unavailable until reset%s."
                 % (esc(info["detail"] or info["message"]), (" — " + esc(when)) if when else ""))
     else:
-        head = ("⚠️ <b>المزوّد رفض الطلب مؤقتًا</b>\n«%s» — وبيعيد المحاولة تلقائيًا%s."
-                % (esc(info["detail"] or info["message"]), (" (التالية " + esc(when) + ")") if when else ""))
-    return head + "\n\n<b>اختار:</b>\n⏳ <b>انتظر</b> — أسيب المهمة وأبلّغك أول ما تكمل.\n🛑 <b>أنهِ الجلسة</b> — أوقف المهمة وأقفل الجلسة دي.\n⏰ <b>نفّذ بعد التجديد</b> — أوقفها دلوقتي وأشغّلها لوحدي أول ما الحد يتجدد."
+        head = ("⚠️ <b>Provider temporarily throttled</b>\n«%s» — retrying automatically%s."
+                % (esc(info["detail"] or info["message"]), (" (next: " + esc(when) + ")") if when else ""))
+    return head + "\n\n<b>Choose an action:</b>\n⏳ <b>Wait</b> — Keep task running and notify upon completion.\n🛑 <b>End Session</b> — Stop task and terminate session.\n⏰ <b>Resume After Reset</b> — Pause now and auto-resume after limit resets."
 
 
 def retry_keyboard():
-    return keyboard([[("⏳ انتظر", "rt:wait"), ("🛑 أنهِ الجلسة", "rt:end")],
-                     [("⏰ نفّذ بعد التجديد", "rt:later"), ("🤖 غيّر الموديل", "menu:md")]])
+    return keyboard([[("⏳ Wait", "rt:wait"), ("🛑 End Session", "rt:end")],
+                     [("⏰ Resume After Reset", "rt:later"), ("🤖 Change Model", "menu:md")]])
 
 
 def render_card(run, busy_label=None):
@@ -371,24 +373,24 @@ def render_card(run, busy_label=None):
     if run["error"]:
         state = f"❌ {esc(run['error'])}"
     elif run["done"]:
-        state = "✅ انتهى"
+        state = "✅ Done"
     elif run.get("retry"):
         r = run["retry"]
-        state = (f"⚠️ {esc(r['message'])} — محاولة {r['attempt']}"
-                 + (f" · التالية {esc(retry_time(r['next']))}" if r.get("next") else ""))
+        state = (f"⚠️ {esc(r['message'])} — attempt {r['attempt']}"
+                 + (f" · next: {esc(retry_time(r['next']))}" if r.get("next") else ""))
     elif any(q["state"] == "pending" for q in run.get("questions", {}).values()):
-        state = "❓ ينتظر إجابتك"
+        state = "❓ Awaiting your answer"
     elif run["perms"] and any(v["state"] == "pending" for v in run["perms"].values()):
-        state = "🔐 ينتظر موافقتك"
+        state = "🔐 Awaiting your approval"
     else:
         running = [run["tools"][i] for i in run["tool_order"] if run["tools"][i]["status"] in ("pending", "running")]
         if running:
             r = running[-1]
             state = f"⚙️ {esc(r['name'])}: <code>{esc(r['summary'])}</code>"
         else:
-            state = busy_label or "💭 يفكّر…"
+            state = busy_label or "💭 Thinking…"
     lines = [head, state,
-             f"📄 {len(run['files'])} ملف · ⌨️ {run['cmds']} أمر · ⏱ {elapsed}s"]
+             f"📄 {len(run['files'])} files · ⌨️ {run['cmds']} commands · ⏱ {elapsed}s"]
     recent = [run["tools"][i] for i in run["tool_order"]][-MAX_TOOL_LINES:]
     if recent:
         icon = {"completed": "✓", "error": "✗", "running": "…", "pending": "…"}
@@ -404,15 +406,15 @@ def render_card(run, busy_label=None):
         lines += ["", "▍ " + esc(clip(tail[-TEXT_TAIL:], TEXT_TAIL))]
     rows = []
     if not run["done"] and not run["error"]:
-        rows.append([("⏹ إيقاف", "stop")])
-    rows.append([("🧠 الأجنت", "menu:ag"), ("🤖 الموديل", "menu:md"), ("🔒 الوضع", "menu:mo")])
-    rows.append([("📂 الجلسات", "menu:se"), ("🆕 جديد", "new"), ("📊 الحالة", "st")])
+        rows.append([("⏹ Stop", "stop")])
+    rows.append([("🧠 Agent", "menu:ag"), ("🤖 Model", "menu:md"), ("🔒 Mode", "menu:mo")])
+    rows.append([("📂 Sessions", "menu:se"), ("🆕 New", "new"), ("📊 Status", "st")])
     if run["done"] or run["error"]:
-        rows.append([("📤 diff", "diff")])
+        rows.append([("📤 Diff", "diff")])
     return "\n".join(lines), keyboard(rows)
 
 
-HELP_BUTTON = ("❓ مساعدة", "hp")
+HELP_BUTTON = ("❓ Help", "hp")
 
 
 def keyboard(rows, help_row=True):
@@ -429,7 +431,7 @@ def question_view(entry):
     q = qs[entry["idx"]]
     qid = entry["props"]["id"]
     opts = (q.get("options") or [])[:8]
-    head = f"❓ <b>سؤال من الأجنت</b> ({entry['idx'] + 1}/{len(qs)})"
+    head = f"❓ <b>Question from Agent</b> ({entry['idx'] + 1}/{len(qs)})"
     if q.get("header"):
         head += f" — {esc(clip(q['header'], 40))}"
     lines = [head, esc(clip(q.get("question"), 400))]
@@ -443,26 +445,26 @@ def question_view(entry):
         rows.append([(f"{mark}{i + 1}. {clip(o.get('label'), 28)}", f"{'qt' if multi else 'qa'}:{qid}:{i}")])
     tail = []
     if multi:
-        tail.append(("✅ تأكيد", f"qd:{qid}"))
+        tail.append(("✅ Confirm", f"qd:{qid}"))
     if q.get("custom", True):
-        tail.append(("✍️ إجابة مكتوبة", f"qc:{qid}"))
-    tail.append(("⛔ تجاهل", f"qr:{qid}"))
+        tail.append(("✍️ Custom Answer", f"qc:{qid}"))
+    tail.append(("⛔ Skip", f"qr:{qid}"))
     rows.append(tail)
-    lines.append("<i>الإجابة تُرسل للأجنت كما هي؛ بدون رد تُرفض بعد 10 دقائق.</i>")
+    lines.append("<i>Answer is passed directly to agent. Auto-rejects after 10m.</i>")
     return "\n".join(lines), keyboard(rows)
 
 
 def permission_text(props, agent):
     meta = props.get("metadata") or {}
     what = meta.get("command") or ", ".join(str(x) for x in (props.get("patterns") or [])) or "—"
-    return (f"🔐 <b>طلب صلاحية</b> — {esc(props.get('permission', '?'))}\n"
-            f"الأجنت: {esc(agent)}\n<pre>{esc(clip(what, 700))}</pre>\n"
-            f"الموافقة لمرة واحدة فقط. بدون موافقة يُرفض بعد 10 دقائق.")
+    return (f"🔐 <b>Permission Request</b> — {esc(props.get('permission', '?'))}\n"
+            f"Agent: {esc(agent)}\n<pre>{esc(clip(what, 700))}</pre>\n"
+            f"Approval is valid once. Expires in 10 minutes if unapproved.")
 
 
 def permission_keyboard(perm_id):
-    return keyboard([[("✅ مرة واحدة", f"pm:o:{perm_id}"), ("⛔ رفض", f"pm:r:{perm_id}")],
-                     [("🛑 إيقاف الجلسة", "stop")]])
+    return keyboard([[("✅ Allow Once", f"pm:o:{perm_id}"), ("⛔ Reject", f"pm:r:{perm_id}")],
+                     [("🛑 Stop Session", "stop")]])
 
 
 def parse_callback(data):
@@ -470,10 +472,10 @@ def parse_callback(data):
     d = str(data or "")
     if len(d) > 64:
         return None
-    if d in ("stop", "new", "st", "diff", "hp", "menu:ag", "menu:md", "menu:mo", "menu:se", "menu:sk",
+    if d in ("stop", "new", "st", "diff", "hp", "menu:ag", "menu:md", "menu:mo", "menu:se", "menu:sk", "menu:lg",
              "mo:read", "mo:build", "pp:an", "pp:ig", "pp:fa", "pp:go", "sk:clear", "rt:wait", "rt:end", "rt:later", "us", "sq", "sc:all", "ho"):
         return d, None
-    m = re.match(r"^(ag|md|se|pg|sk|sp):([A-Za-z0-9_.:\-/]+)$", d)
+    m = re.match(r"^(ag|md|se|pg|sk|sp|lang):([A-Za-z0-9_.:\-/]+)$", d)
     if m:
         kind, arg = m.groups()
         if kind == "ag" and not AGENT_RE.match(arg):
@@ -661,6 +663,7 @@ class Room:
         self.lock = threading.RLock()
         self.run = None
         self.state = self._load()
+        self.lang = self.state.get("lang") or CFG.language or "en"
         self._agents = None
         self._models = None
         self._skills = None
@@ -802,7 +805,7 @@ class Room:
     # Every menu is built as (text, keyboard) so a button press can refresh the very message it
     # was pressed on (the selection mark moves) instead of piling up new messages.
     def build_agents(self):
-        lines = ["🧠 <b>اختر الأجنت</b> (الحالي: <b>%s</b>)" % esc(self.state["agent"])]
+        lines = ["🧠 <b>Select Agent</b> (Current: <b>%s</b>)" % esc(self.state["agent"])]
         rows, row = [], []
         for a in self.agents():
             mark = "● " if a["name"] == self.state["agent"] else ""
@@ -827,23 +830,23 @@ class Room:
             rows.append([(mark + m, f"md:{models.index(m)}")])
         nav = []
         if page == 0 and rest:
-            nav.append(("➡️ كل الموديلات", "pg:1"))
+            nav.append(("➡️ All Models", "pg:1"))
         if page > 0:
-            nav.append(("⭐ المفضلة", "pg:0"))
+            nav.append(("⭐ Favorites", "pg:0"))
             if len(rest) > page * 12:
-                nav.append(("➡️ التالي", f"pg:{page + 1}"))
+                nav.append(("➡️ Next", f"pg:{page + 1}"))
         if nav:
             rows.append(nav)
         if not models:
-            return "🤖 تعذر تحميل قائمة الموديلات الآن. جرّب بعد قليل أو استعمل <code>/m provider/model المهمة</code>.", None
+            return "🤖 Could not load models list right now. Try again shortly or use <code>/m provider/model <task></code>.", None
         self.menu_page = page
-        return (f"🤖 <b>اختر الموديل</b> (الحالي: <b>{esc(self.state['model'] or 'الافتراضي')}</b>)"
-                f"{' — صفحة ' + str(page) if page else ''}"), keyboard(rows)
+        return (f"🤖 <b>Select Model</b> (Current: <b>{esc(self.state['model'] or 'Default')}</b>)"
+                f"{' — Page ' + str(page) if page else ''}"), keyboard(rows)
 
     def build_mode(self):
         cur = self.state["mode"]
-        return (f"🔒 <b>الوضع</b> الحالي: <b>{esc(cur)}</b>\n"
-                "read: يرفض أي تعديل ملفات · build: التعديل مسموح، وأي أداة تسأل تظهر لك كزر موافقة.",
+        return (f"🔒 <b>Execution Mode</b> (Current: <b>{esc(cur)}</b>)\n"
+                "read: Refuses file modifications · build: Modifications permitted with explicit approval buttons.",
                 keyboard([[(("● " if cur == "read" else "") + "🔒 read", "mo:read"),
                            (("● " if cur == "build" else "") + "🔓 build", "mo:build")]]))
 
@@ -858,16 +861,16 @@ class Room:
         for s in sessions[:8]:
             mark = "● " if s["id"] == self.state["session_id"] else ""
             rows.append([(clip(mark + (s.get("title") or s["id"]), 40), f"se:{s['id']}")])
-        rows.append([("🆕 جلسة جديدة", "new")])
-        return "📂 <b>الجلسات</b> — اضغط للاستكمال", keyboard(rows)
+        rows.append([("🆕 New Session", "new")])
+        return "📂 <b>Active Sessions</b> — tap to resume", keyboard(rows)
 
     def build_skills(self, page=0):
         skills = self.skills()
         per = 8
         chunk = skills[page * per:(page + 1) * per]
         cur = self.state.get("skill")
-        lines = ["🧰 <b>المهارات</b> — اختر مهارة ثم اكتب المهمة"
-                 + (f" (المختارة: <b>{esc(cur)}</b>)" if cur else "")]
+        lines = ["🧰 <b>Skills</b> — select a skill then send your task"
+                 + (f" (Active: <b>{esc(cur)}</b>)" if cur else "")]
         rows = []
         for sk in chunk:
             rows.append([(("● " if sk["name"] == cur else "") + sk["name"], f"sk:{sk['name']}")])
@@ -875,15 +878,15 @@ class Room:
                 lines.append(f"• <b>{esc(sk['name'])}</b>: {esc(clip(sk['description'], 70))}")
         nav = []
         if page > 0:
-            nav.append(("⬅️ السابق", f"sp:{page - 1}"))
+            nav.append(("⬅️ Previous", f"sp:{page - 1}"))
         if (page + 1) * per < len(skills):
-            nav.append(("➡️ التالي", f"sp:{page + 1}"))
+            nav.append(("➡️ Next", f"sp:{page + 1}"))
         if nav:
             rows.append(nav)
         if cur:
-            rows.append([("❌ إلغاء المهارة", "sk:clear")])
+            rows.append([("❌ Clear Skill", "sk:clear")])
         if not skills:
-            return "🧰 تعذر تحميل قائمة المهارات الآن.", None
+            return "🧰 Could not load skills list right now.", None
         return "\n".join(lines), keyboard(rows)
 
     def menu_skills(self, page=0):
@@ -913,6 +916,23 @@ class Room:
     def menu_sessions(self):
         self.show_menu(self.build_sessions)
 
+    def t(self, key, **kwargs):
+        return t(key, lang=self.lang, **kwargs)
+
+    def build_language(self):
+        cur = self.lang
+        rows = [
+            [(("● " if cur == "en" else "") + "🇺🇸 English", "lang:en")],
+            [(("● " if cur == "ar" else "") + "🇸🇦 العربية", "lang:ar")]
+        ]
+        return self.t("select_language"), keyboard(rows)
+
+    def menu_language(self, msg=None):
+        if msg:
+            self.refresh_menu(msg, self.build_language)
+        else:
+            self.show_menu(self.build_language)
+
     def status_text(self):
         st = self.state
         try:
@@ -923,11 +943,11 @@ class Room:
         except Exception:
             dirty, branch = "?", "?"
         run = self.run
-        busy = "نعم" if run and not run["done"] else "لا"
-        return (f"📊 <b>الحالة</b>\n🧠 الأجنت: {esc(st['agent'])}\n🤖 الموديل: {esc(st['model'] or 'الافتراضي')}\n"
-                f"🔒 الوضع: {esc(st['mode'])}\n📂 الجلسة: {esc((st['session_id'] or 'جديدة')[:18])}\n"
-                f"⏳ يعمل الآن: {busy}\n🔢 اليوم: {st['count']}/{DAILY_LIMIT}\n"
-                f"🌿 {esc(branch)} · ملفات معدلة: {dirty}")
+        busy = "Yes" if run and not run["done"] else "No"
+        return (f"📊 <b>System Status</b>\n🧠 Agent: {esc(st['agent'])}\n🤖 Model: {esc(st['model'] or 'Default')}\n"
+                f"🔒 Mode: {esc(st['mode'])}\n📂 Session: {esc((st['session_id'] or 'New')[:18])}\n"
+                f"⏳ Running: {busy}\n🔢 Daily Tasks: {st['count']}/{DAILY_LIMIT}\n"
+                f"🌿 Branch: {esc(branch)} · Modified files: {dirty}")
 
     # ---- running a prompt --------------------------------------------------------
     def ensure_session(self, title):
@@ -1454,6 +1474,8 @@ class Room:
             return self.menu_sessions()
         if cmd == "/new":
             return self.new_session()
+        if cmd in ("/lang", "/language"):
+            return self.menu_language()
         if cmd == "/stop":
             return self.stop()
         if cmd == "/status":
@@ -1556,6 +1578,16 @@ class Room:
         if kind == "hp":
             self.answer_cb(cb_id)
             return self.send(self.help_text(), self.help_keyboard())
+        if kind == "menu:lg":
+            self.answer_cb(cb_id)
+            return self.menu_language(msg)
+        if kind == "lang":
+            if arg in ("en", "ar"):
+                self.lang = arg
+                self.state["lang"] = arg
+                self._save()
+                self.answer_cb(cb_id, self.t("lang_changed"))
+                return self.refresh_menu(msg, self.build_language)
         if kind in ("rt:wait", "rt:end", "rt:later"):
             return self.retry_choice(cb_id, kind, msg)
         if kind == "ho":
@@ -1781,26 +1813,15 @@ class Room:
         return self.help_keyboard(help_row=True)
 
     def help_keyboard(self, help_row=False):
-        return keyboard([[("🛠 pinpoint-go الآن", "pp:go"), ("🧰 المهارات", "menu:sk")],
-                         [("🧠 الأجنت", "menu:ag"), ("🤖 الموديل", "menu:md"), ("🔒 الوضع", "menu:mo")],
-                         [("📂 الجلسات", "menu:se"), ("🆕 جديد", "new"), ("⏹ إيقاف", "stop")],
-                         [("📊 الحالة", "st"), ("📈 الاستهلاك", "us"), ("📤 diff", "diff")],
-                         [("🔁 تسليم لأداة تانية", "ho")]], help_row=help_row)
+        return keyboard([[(self.t("btn_agent"), "menu:ag"), (self.t("btn_model"), "menu:md"), (self.t("btn_mode"), "menu:mo")],
+                         [(self.t("btn_sessions"), "menu:se"), (self.t("btn_new"), "new"), (self.t("btn_stop"), "stop")],
+                         [(self.t("btn_status"), "st"), (self.t("btn_usage"), "us"), (self.t("btn_diff"), "diff")],
+                         [(self.t("btn_skills"), "menu:sk"), (self.t("btn_handoff"), "ho"), (self.t("btn_language"), "menu:lg")]], help_row=help_row)
 
     def help_text(self):
         cur = self.state.get("skill")
-        return ("🛰 <b>غرفة التحكم</b> — اكتب مهمتك مباشرة، أو استعمل الأزرار:\n"
-                "🛠 <b>pinpoint-go</b>: يشغّل مهارة معالجة النقاط والأخطاء (فرز → إصلاح → اختبار → commit محلي، "
-                "بدون push أو نشر، وكل أمر سيرفر يطلب موافقتك).\n"
-                "🧰 <b>المهارات</b>: اختر أي مهارة ثم اكتب المهمة.\n"
-                "🔧 على أي تنبيه خطأ: «أصلح هذا» لهذا الخطأ فقط، «أصلح الكل» لكل المفتوح.\n"
-                "📈 <b>الاستهلاك</b>: عداد آخر 24 ساعة، حالة الحد وموعد تجديده، والمهام المجدولة بعد التجديد (/usage /queue).\n"
-                "🔁 <b>تسليم</b>: ملخص جاهز للنسخ لأي أداة تانية (Claude/Codex/Gemini/Antigravity) لو opencode خلص (/handoff).\n"
-                "الأوامر: /agents /models /mode /sessions /new /stop /status /diff /skills /usage /queue /handoff\n"
-                "/orchestrate مهمة — المنسّق يوزّع على فريق الأجنتس · /plan مهمة — خطة بلا تنفيذ · "
-                "/m provider/model مهمة\n"
-                "أي أداة تطلب صلاحية تظهر كزر «مرة واحدة / رفض»."
-                + (f"\n🧰 المهارة المختارة الآن: <b>{esc(cur)}</b>" if cur else ""))
+        tag = (f"\n🧰 Active Skill: <b>{esc(cur)}</b>" if self.lang == "en" else f"\n🧰 المهارة المختارة: <b>{esc(cur)}</b>") if cur else ""
+        return self.t("help_title") + tag
 
 
 # --------------------------------------------------------------------------------------
@@ -1897,7 +1918,7 @@ def main():
 
     legacy.log("room_started", result=f"target={TARGET_DIR}")
     try:
-        room.send("🟢 غرفة التحكم جاهزة. اكتب /help", room.home_keyboard())
+        room.send(room.t("ready"), room.home_keyboard())
     except Exception:
         pass
     offset = 0

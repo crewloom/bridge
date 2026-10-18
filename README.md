@@ -1,4 +1,4 @@
-# ⚡ Rumuze Edit (رموز إيديت)
+# ⚡ Rumuze Edit
 
 > **Remote AI Coding Agent Bridge & Live Telegram Control Room**  
 > Control [OpenCode](https://opencode.ai), AI coding agents, and terminal tools on your local machine or VPS directly from your phone via Telegram.
@@ -183,31 +183,6 @@ Rumuze Edit is engineered with a strict security model:
 
 ### Can multiple developers share the same bot?
 By design, each Rumuze Edit daemon is bound to a single user (`ALLOWED_CHAT_ID`) for ironclad security. If multiple team members want to use it, each developer can run their own daemon with their own bot token.
-
----
-
-## 🇸🇦 الدليل بالعربية (Arabic Guide)
-
-**رموز إيديت (Rumuze Edit)** هي أداة مفتوحة المصدر لربط وكلاء الذكاء الاصطناعي (مثل OpenCode و Claude Code) بحسابك على تليجرام، لتتحكم في مشاريعك وتنفذ أوامر وتعدل الأكواد مباشرة من موبايلك.
-
-### أبرز المميزات:
-1. **كارت البث الحي (Live Card):** رسالة في تليجرام تتحدث تلقائياً لحظة بلحظة لتعرض لك ما ينفذه الـ Agent من أوامر bash أو تعديل ملفات.
-2. **أزرار موافقة تفاعلية:** عندما يطلب الـ Agent صلاحية لتعديل كود أو تشغيل أمر تيرمينال، تظهر لك أزرار `[موافقة لمرة واحدة]` أو `[رفض]`.
-3. **أزرار أسئلة الـ Agent:** إذا سألك الـ Agent أي سؤال متعدد الخيارات، يتحول السؤال إلى أزرار تليجرام تفاعلية تضغط عليها بلمسة واحدة.
-4. **بدون أي مكتبات إضافية:** خفيفة جداً، مبنية بـ Node.js خالص و Python Standard Library دون الحاجة لأي `pip install`.
-5. **مستويات أمان صارمة:** محبوسة على مجلد البروجكت فقط، تمنع أوامر التدمير والـ `sudo` وقراءة مفاتيح الـ SSH.
-
-### التثبيت والتشغيل:
-```bash
-# الإعداد والربط التلقائي بالبوت
-npx rumuze-edit init
-
-# بدء التشغيل
-npx rumuze-edit start
-
-# أو التشغيل في الخلفية كـ Service
-npx rumuze-edit service install
-```
 
 ---
 
