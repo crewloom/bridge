@@ -67,18 +67,32 @@ class TestPermissions(unittest.TestCase):
             "metadata": {"command": "rm -rf /"},
             "patterns": ["rm -rf /"],
         }
-        # Even in auto mode, dangerous commands MUST be rejected
+        # Even in auto mode, destructive commands MUST be rejected
         decision, reason = decide_permission(dangerous_props, mode="auto")
         self.assertEqual(decision, "reject")
         self.assertIn("السياسة ترفض", reason)
 
-        sudo_props = {
+        format_props = {
             "permission": "bash",
-            "metadata": {"command": "sudo systemctl restart nginx"},
-            "patterns": ["sudo*"],
+            "metadata": {"command": "mkfs.ext4 /dev/nvme0n1"},
+            "patterns": ["mkfs*"],
         }
-        decision_sudo, _ = decide_permission(sudo_props, mode="auto")
-        self.assertEqual(decision_sudo, "reject")
+        decision_format, _ = decide_permission(format_props, mode="auto")
+        self.assertEqual(decision_format, "reject")
+
+    def test_decide_permission_ops_and_ssh(self):
+        ops_props = {
+            "permission": "bash",
+            "metadata": {"command": "tools/ai/pinpoint_go.sh pinpoints"},
+            "patterns": ["tools/ai/pinpoint_go.sh*"],
+        }
+        # In build mode, user is asked for approval
+        decision_build, _ = decide_permission(ops_props, mode="build")
+        self.assertEqual(decision_build, "ask")
+
+        # In auto mode, ops script is allowed
+        decision_auto, _ = decide_permission(ops_props, mode="auto")
+        self.assertEqual(decision_auto, "allow")
 
 
 if __name__ == "__main__":
