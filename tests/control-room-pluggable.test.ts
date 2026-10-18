@@ -183,3 +183,45 @@ test('ControlRoom - enforces security policy and prompt guard across pluggable c
 
   room.stop();
 });
+
+test('ControlRoom - getMainKeyboard provides complete 5-row 14-button mission control layout', () => {
+  const cfg = new ConfigManager(process.cwd());
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  const kb = room.getMainKeyboard();
+  assert.equal(kb.rows.length, 5);
+  assert.equal(kb.inline_keyboard.length, 5);
+
+  // Row 1: Agents, Models, Mode
+  assert.equal(kb.rows[0]?.[0]?.callbackData, 'menu:ag');
+  assert.equal(kb.rows[0]?.[1]?.callbackData, 'menu:md');
+  assert.equal(kb.rows[0]?.[2]?.callbackData, 'menu:mo');
+
+  // Row 2: Sessions, New, Stop
+  assert.equal(kb.rows[1]?.[0]?.callbackData, 'menu:se');
+  assert.equal(kb.rows[1]?.[1]?.callbackData, 'new');
+  assert.equal(kb.rows[1]?.[2]?.callbackData, 'stop');
+
+  // Row 3: Status, Projects, Diff
+  assert.equal(kb.rows[2]?.[0]?.callbackData, 'st');
+  assert.equal(kb.rows[2]?.[1]?.callbackData, 'menu:ws');
+  assert.equal(kb.rows[2]?.[2]?.callbackData, 'diff');
+
+  // Row 4: Skills, Usage, Language
+  assert.equal(kb.rows[3]?.[0]?.callbackData, 'menu:sk');
+  assert.equal(kb.rows[3]?.[1]?.callbackData, 'us');
+  assert.equal(kb.rows[3]?.[2]?.callbackData, 'menu:lg');
+
+  // Row 5: Handoff, Help
+  assert.equal(kb.rows[4]?.[0]?.callbackData, 'ho');
+  assert.equal(kb.rows[4]?.[1]?.callbackData, 'hp');
+
+  room.stop();
+});

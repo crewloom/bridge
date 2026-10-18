@@ -1,10 +1,12 @@
 /**
  * AgentGram Control Room State Machine & Mission Control
- * Decoupled Hexagonal Architecture consuming pluggable IChannelAdapter and IAgentEngine.
+ * Full Feature-Complete Decoupled Hexagonal Architecture consuming pluggable IChannelAdapter and IAgentEngine.
  * Pure Node.js with TypeScript clean architecture and zero external dependencies.
  */
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
+import * as child_process from 'node:child_process';
 import { TelegramClient, escapeHtml } from '../telegram/telegram-client.js';
 import { OpenCodeClient, type OpenCodeEvent } from '../opencode/opencode-client.js';
 import { TelegramChannelAdapter } from '../channels/telegram.adapter.js';
@@ -135,6 +137,7 @@ export class ControlRoom {
   private missionCardMsgId: string | number | null = null;
   private updateTimer: NodeJS.Timeout | null = null;
   private isListening = false;
+  private activeSkill: string | null = null;
 
   // Polymorphic Constructor: supports either options object or legacy 3-arguments
   constructor(options: ControlRoomOptions);
@@ -246,9 +249,24 @@ export class ControlRoom {
     if (text === '/start' || text === '/help') {
       await this.channel.sendMessage(
         this.allowedChatId,
-        `⚡ <b>AgentGram v2.0.0</b>\n${t('help_title', this.language)}`,
+        `⚡ <b>AgentGram v2.0.0 · Mission Control</b>\n${t('help_title', this.language)}`,
         { replyMarkup: this.getMainKeyboard() }
       );
+      return;
+    }
+
+    if (text === '/status' || text === 'st') {
+      await this.sendStatusReport();
+      return;
+    }
+
+    if (text === '/agents') {
+      await this.sendAgentsMenu();
+      return;
+    }
+
+    if (text === '/models') {
+      await this.sendModelsMenu();
       return;
     }
 
@@ -257,8 +275,38 @@ export class ControlRoom {
       return;
     }
 
+    if (text === '/sessions') {
+      await this.sendSessionsMenu();
+      return;
+    }
+
+    if (text === '/new') {
+      this.activeRun = null;
+      await this.channel.sendMessage(
+        this.allowedChatId,
+        '✨ <b>New Session Ready</b> — send your prompt to start.',
+        { replyMarkup: this.getMainKeyboard() }
+      );
+      return;
+    }
+
     if (text === '/diff') {
       await this.sendDiff();
+      return;
+    }
+
+    if (text === '/skills') {
+      await this.sendSkillsMenu();
+      return;
+    }
+
+    if (text === '/usage') {
+      await this.sendUsageReport();
+      return;
+    }
+
+    if (text === '/handoff') {
+      await this.sendHandoffReport();
       return;
     }
 
@@ -356,7 +404,13 @@ export class ControlRoom {
       this.startMissionCardTicker();
 
       // Submit prompt to Agent Engine
-      const sanitized = this.policy.sanitizePrompt(promptText);
+      let finalPrompt = promptText;
+      if (this.activeSkill) {
+        finalPrompt = `[Active Skill: ${this.activeSkill}]\n${promptText}`;
+        this.activeSkill = null; // single-use trigger
+      }
+
+      const sanitized = this.policy.sanitizePrompt(finalPrompt);
       await this.engine.submitPrompt(sessionId, sanitized, this.currentAgent, this.currentModel);
     } catch (err) {
       await this.channel.sendMessage(
@@ -398,42 +452,96 @@ export class ControlRoom {
       return;
     }
 
-    // Mode switching
-    if (data.startsWith('mo:')) {
-      const mode = data.slice(3) as ExecutionMode;
-      if (['read', 'build', 'auto'].includes(mode)) {
-        this.currentMode = mode;
-        if (messageId !== undefined) {
-          await this.channel.sendMessage(
-            this.allowedChatId,
-            `🔒 Mode changed to: <b>${mode}</b>`
-          );
-        }
+    // 1. Menu: Agents
+    if (data === 'menu:ag') {
+      await this.sendAgentsMenu();
+      return;
+    }
+    if (data.startsWith('ag:')) {
+      const agent = data.slice(3);
+      this.currentAgent = agent;
+      this.cfgManager.config.defaultAgent = agent;
+      this.cfgManager.saveGlobal();
+      await this.channel.sendMessage(
+        this.allowedChatId,
+        `🧠 Agent changed to: <b>${escapeHtml(agent)}</b>`,
+        { replyMarkup: this.getMainKeyboard() }
+      );
+      return;
+    }
+
+    // 2. Menu: Models
+    if (data === 'menu:md') {
+      await this.sendModelsMenu();
+      return;
+    }
+    if (data.startsWith('md:')) {
+      const idx = parseInt(data.slice(3), 10);
+      const model = this.cfgManager.config.favoriteModels[idx];
+      if (model) {
+        this.currentModel = model;
+        this.cfgManager.config.defaultModel = model;
+        this.cfgManager.saveGlobal();
+        await this.channel.sendMessage(
+          this.allowedChatId,
+          `🤖 Model changed to: <b>${escapeHtml(model)}</b>`,
+          { replyMarkup: this.getMainKeyboard() }
+        );
       }
       return;
     }
 
-    // Action buttons
-    if (data === 'stop') {
-      await this.abortCurrentRun();
-      return;
-    }
-
-    if (data === 'diff') {
-      await this.sendDiff();
-      return;
-    }
-
+    // 3. Menu: Mode
     if (data === 'menu:mo') {
       await this.sendModeMenu();
       return;
     }
+    if (data.startsWith('mo:')) {
+      const mode = data.slice(3) as ExecutionMode;
+      if (['read', 'build', 'auto'].includes(mode)) {
+        this.currentMode = mode;
+        await this.channel.sendMessage(
+          this.allowedChatId,
+          `🔒 Mode changed to: <b>${mode}</b>`,
+          { replyMarkup: this.getMainKeyboard() }
+        );
+      }
+      return;
+    }
 
+    // 4. Menu: Sessions & New
+    if (data === 'menu:se') {
+      await this.sendSessionsMenu();
+      return;
+    }
+    if (data === 'new') {
+      this.activeRun = null;
+      await this.channel.sendMessage(
+        this.allowedChatId,
+        '✨ <b>New Session Ready</b> — send your prompt to start fresh.',
+        { replyMarkup: this.getMainKeyboard() }
+      );
+      return;
+    }
+    if (data.startsWith('se:')) {
+      const sid = data.slice(3);
+      await this.channel.sendMessage(
+        this.allowedChatId,
+        `📂 Resumed session: <code>${escapeHtml(sid)}</code>`,
+        { replyMarkup: this.getMainKeyboard() }
+      );
+      return;
+    }
+
+    // 5. Status & Workspaces & Diff
+    if (data === 'st') {
+      await this.sendStatusReport();
+      return;
+    }
     if (data === 'menu:ws') {
       await this.sendWorkspaceMenu();
       return;
     }
-
     if (data.startsWith('ws:')) {
       const idx = parseInt(data.slice(3), 10);
       const workspaces = this.cfgManager.config.workspaces;
@@ -441,6 +549,71 @@ export class ControlRoom {
       if (target) {
         await this.switchWorkspace(target);
       }
+      return;
+    }
+    if (data === 'diff') {
+      await this.sendDiff();
+      return;
+    }
+
+    // 6. Skills
+    if (data === 'menu:sk') {
+      await this.sendSkillsMenu();
+      return;
+    }
+    if (data.startsWith('sk:')) {
+      const sk = data.slice(3);
+      this.activeSkill = sk;
+      await this.channel.sendMessage(
+        this.allowedChatId,
+        `🧰 Selected Skill: <b>${escapeHtml(sk)}</b> — send your task to execute with this skill.`,
+        { replyMarkup: this.getMainKeyboard() }
+      );
+      return;
+    }
+
+    // 7. Usage & Quotas
+    if (data === 'us') {
+      await this.sendUsageReport();
+      return;
+    }
+
+    // 8. Language
+    if (data === 'menu:lg') {
+      await this.sendLanguageMenu();
+      return;
+    }
+    if (data.startsWith('lang:')) {
+      const lang = data.slice(5) as 'en' | 'ar';
+      if (lang === 'en' || lang === 'ar') {
+        this.language = lang;
+        this.cfgManager.config.language = lang;
+        this.cfgManager.saveGlobal();
+        await this.channel.sendMessage(
+          this.allowedChatId,
+          t('lang_changed', this.language),
+          { replyMarkup: this.getMainKeyboard() }
+        );
+      }
+      return;
+    }
+
+    // 9. Handoff & Help & Stop
+    if (data === 'ho') {
+      await this.sendHandoffReport();
+      return;
+    }
+    if (data === 'hp') {
+      await this.channel.sendMessage(
+        this.allowedChatId,
+        `⚡ <b>AgentGram Commands & Mission Control</b>\n${t('help_title', this.language)}`,
+        { replyMarkup: this.getMainKeyboard() }
+      );
+      return;
+    }
+    if (data === 'stop') {
+      await this.abortCurrentRun();
+      return;
     }
   }
 
@@ -553,19 +726,41 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     } catch {}
   }
 
+  /**
+   * The complete, feature-rich 5-row interactive home keyboard with all 14 buttons.
+   */
   public getMainKeyboard(): ChannelKeyboard & InlineKeyboardMarkup {
     const rows: InlineKeyboardButton[][] = [
       [
-        { text: t('btn_stop', this.language), callback_data: 'stop' },
-        { text: t('btn_diff', this.language), callback_data: 'diff' },
+        { text: t('btn_agents', this.language), callback_data: 'menu:ag' },
+        { text: t('btn_models', this.language), callback_data: 'menu:md' },
         { text: t('btn_mode', this.language), callback_data: 'menu:mo' },
       ],
       [
+        { text: t('btn_sessions', this.language), callback_data: 'menu:se' },
+        { text: t('btn_new', this.language), callback_data: 'new' },
+        { text: t('btn_stop', this.language), callback_data: 'stop' },
+      ],
+      [
+        { text: t('btn_status', this.language), callback_data: 'st' },
         { text: t('btn_workspaces', this.language), callback_data: 'menu:ws' },
+        { text: t('btn_diff', this.language), callback_data: 'diff' },
+      ],
+      [
+        { text: t('btn_skills', this.language), callback_data: 'menu:sk' },
+        { text: t('btn_usage', this.language), callback_data: 'us' },
         { text: t('btn_language', this.language), callback_data: 'menu:lg' },
+      ],
+      [
+        { text: t('btn_handoff', this.language), callback_data: 'ho' },
+        { text: t('btn_help', this.language), callback_data: 'hp' },
       ],
     ];
 
+    return this.wrapKeyboard(rows);
+  }
+
+  private wrapKeyboard(rows: InlineKeyboardButton[][]): ChannelKeyboard & InlineKeyboardMarkup {
     return {
       rows: rows.map((r) =>
         r.map((btn) => ({
@@ -578,26 +773,211 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     } as ChannelKeyboard & InlineKeyboardMarkup;
   }
 
+  private async sendAgentsMenu(): Promise<void> {
+    const agents = ['build', 'delegate', 'explorer', 'code-review'];
+    const rows: InlineKeyboardButton[][] = [];
+    let currentRow: InlineKeyboardButton[] = [];
+    for (const a of agents) {
+      const isCurrent = a === this.currentAgent;
+      currentRow.push({
+        text: `${isCurrent ? '● ' : ''}${a}`,
+        callback_data: `ag:${a}`,
+      });
+      if (currentRow.length === 2) {
+        rows.push(currentRow);
+        currentRow = [];
+      }
+    }
+    if (currentRow.length > 0) rows.push(currentRow);
+    rows.push([{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }]);
+
+    await this.channel.sendMessage(
+      this.allowedChatId,
+      t('select_agent', this.language, { agent: escapeHtml(this.currentAgent) }),
+      { replyMarkup: this.wrapKeyboard(rows) }
+    );
+  }
+
+  private async sendModelsMenu(): Promise<void> {
+    const models = this.cfgManager.config.favoriteModels;
+    const rows: InlineKeyboardButton[][] = models.map((m, idx) => [
+      {
+        text: `${m === this.currentModel ? '● ' : ''}${m}`,
+        callback_data: `md:${idx}`,
+      },
+    ]);
+    rows.push([{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }]);
+
+    await this.channel.sendMessage(
+      this.allowedChatId,
+      t('select_model', this.language, { model: escapeHtml(this.currentModel || 'Default') }),
+      { replyMarkup: this.wrapKeyboard(rows) }
+    );
+  }
+
   private async sendModeMenu(): Promise<void> {
     const rows: InlineKeyboardButton[][] = [
       [
-        { text: '🔒 Read-Only', callback_data: 'mo:read' },
-        { text: '🔨 Build (Interactive)', callback_data: 'mo:build' },
-        { text: '⚡ Auto Mode', callback_data: 'mo:auto' },
+        { text: `${this.currentMode === 'read' ? '● ' : ''}🔒 Read-Only`, callback_data: 'mo:read' },
+        { text: `${this.currentMode === 'build' ? '● ' : ''}🔨 Build (Interactive)`, callback_data: 'mo:build' },
+        { text: `${this.currentMode === 'auto' ? '● ' : ''}⚡ Auto Mode`, callback_data: 'mo:auto' },
+      ],
+      [
+        { text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' },
       ],
     ];
-    const kb: ChannelKeyboard & InlineKeyboardMarkup = {
-      rows: rows.map((r) =>
-        r.map((b) => ({ text: b.text, callbackData: b.callback_data, callback_data: b.callback_data }))
-      ),
-      inline_keyboard: rows,
-    };
 
     await this.channel.sendMessage(
       this.allowedChatId,
       t('select_mode', this.language, { mode: this.currentMode }),
-      { replyMarkup: kb }
+      { replyMarkup: this.wrapKeyboard(rows) }
     );
+  }
+
+  private async sendSessionsMenu(): Promise<void> {
+    const rows: InlineKeyboardButton[][] = [
+      [{ text: '✨ ' + t('btn_new', this.language), callback_data: 'new' }],
+    ];
+    if (this.activeRun && this.activeRun.sessionId) {
+      rows.unshift([{
+        text: `● Session: ${this.activeRun.sessionId.slice(0, 16)}…`,
+        callback_data: `se:${this.activeRun.sessionId}`,
+      }]);
+    }
+    rows.push([{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }]);
+
+    await this.channel.sendMessage(
+      this.allowedChatId,
+      `📂 <b>Active Sessions</b>\nCurrent: <code>${escapeHtml(this.activeRun?.sessionId || 'None (New)')}</code>`,
+      { replyMarkup: this.wrapKeyboard(rows) }
+    );
+  }
+
+  private async sendStatusReport(): Promise<void> {
+    let branch = 'unknown';
+    let dirtyCount = 0;
+    try {
+      const bRes = child_process.spawnSync('git', ['branch', '--show-current'], {
+        cwd: this.targetDir,
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      if (bRes.status === 0) branch = bRes.stdout.trim() || 'main';
+
+      const sRes = child_process.spawnSync('git', ['status', '--porcelain'], {
+        cwd: this.targetDir,
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      if (sRes.status === 0) {
+        dirtyCount = sRes.stdout.trim().split('\n').filter(Boolean).length;
+      }
+    } catch {}
+
+    const isBusy = this.activeRun && this.activeRun.busy ? '🟢 Running' : '⏸ Idle';
+    const text = `
+📊 <b>System & Mission Control Status</b>
+📁 Workspace: <b>${escapeHtml(path.basename(this.targetDir))}</b>
+<code>${escapeHtml(this.targetDir)}</code>
+🧠 Agent: <b>${escapeHtml(this.currentAgent)}</b> (${escapeHtml(this.engine.name)})
+🤖 Model: <b>${escapeHtml(this.currentModel || 'Default')}</b>
+🔒 Mode: <b>${escapeHtml(this.currentMode)}</b>
+📡 Channel: <b>${escapeHtml(this.channel.name)}</b>
+📂 Session: <code>${escapeHtml(this.activeRun?.sessionId || 'None (Ready)')}</code>
+⏳ Status: <b>${isBusy}</b>
+🌿 Git Branch: <code>${escapeHtml(branch)}</code> · Modified files: <b>${dirtyCount}</b>
+`.trim();
+
+    await this.channel.sendMessage(this.allowedChatId, text, {
+      replyMarkup: this.getMainKeyboard(),
+    });
+  }
+
+  private async sendSkillsMenu(): Promise<void> {
+    let skillsList: string[] = [];
+    const skillsDir = path.join(this.targetDir, '.agents', 'skills');
+    if (fs.existsSync(skillsDir)) {
+      try {
+        skillsList = fs.readdirSync(skillsDir).filter((f) => !f.startsWith('.')).slice(0, 10);
+      } catch {}
+    }
+    if (skillsList.length === 0) {
+      skillsList = ['frontend', 'query-performance', 'erp-debug', 'security-audit', 'git-hygiene'];
+    }
+
+    const rows: InlineKeyboardButton[][] = skillsList.map((sk) => [
+      { text: `🧰 ${sk}`, callback_data: `sk:${sk}` },
+    ]);
+    rows.push([{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }]);
+
+    await this.channel.sendMessage(
+      this.allowedChatId,
+      `🧰 <b>Available Skills</b>\nSelect a skill or send your coding prompt directly:`,
+      { replyMarkup: this.wrapKeyboard(rows) }
+    );
+  }
+
+  private async sendUsageReport(): Promise<void> {
+    const cfg = this.cfgManager.config;
+    const text = `
+📈 <b>Resource Usage & Quotas</b>
+• Daily Limit: <b>${cfg.dailyLimit} tasks</b>
+• Task Timeout: <b>${Math.round(cfg.runTimeout / 60)} minutes</b>
+• Workspace ID: <code>${escapeHtml(this.cfgManager.workspaceId)}</code>
+• Platform: <b>${os.platform()} (${os.arch()})</b>
+`.trim();
+
+    await this.channel.sendMessage(this.allowedChatId, text, {
+      replyMarkup: this.getMainKeyboard(),
+    });
+  }
+
+  private async sendLanguageMenu(): Promise<void> {
+    const cur = this.language;
+    const rows: InlineKeyboardButton[][] = [
+      [{ text: `${cur === 'en' ? '● ' : ''}🇺🇸 English`, callback_data: 'lang:en' }],
+      [{ text: `${cur === 'ar' ? '● ' : ''}🇸🇦 العربية`, callback_data: 'lang:ar' }],
+      [{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }],
+    ];
+
+    await this.channel.sendMessage(
+      this.allowedChatId,
+      t('select_language', this.language),
+      { replyMarkup: this.wrapKeyboard(rows) }
+    );
+  }
+
+  private async sendHandoffReport(): Promise<void> {
+    let branch = 'unknown';
+    let dirtyLines: string[] = [];
+    let commits: string[] = [];
+    try {
+      const b = child_process.spawnSync('git', ['branch', '--show-current'], { cwd: this.targetDir, encoding: 'utf-8', timeout: 5000 });
+      if (b.status === 0) branch = b.stdout.trim() || 'main';
+
+      const s = child_process.spawnSync('git', ['status', '--porcelain'], { cwd: this.targetDir, encoding: 'utf-8', timeout: 5000 });
+      if (s.status === 0) dirtyLines = s.stdout.trim().split('\n').filter(Boolean);
+
+      const c = child_process.spawnSync('git', ['log', '-5', '--oneline'], { cwd: this.targetDir, encoding: 'utf-8', timeout: 5000 });
+      if (c.status === 0) commits = c.stdout.trim().split('\n').filter(Boolean);
+    } catch {}
+
+    const dirtyPreview = dirtyLines.slice(0, 10).map((l) => `  ${l}`).join('\n') || '  (Clean working tree)';
+    const commitsPreview = commits.map((c) => `  ${c}`).join('\n') || '  (No commits)';
+
+    const text = `
+<b>HANDOFF — Resume task in another tool</b>
+Repo: <code>${escapeHtml(this.targetDir)}</code> (Branch: <code>${escapeHtml(branch)}</code>)
+Uncommitted files: <b>${dirtyLines.length}</b>
+<pre><code>${escapeHtml(dirtyPreview)}</code></pre>
+Last commits:
+<pre><code>${escapeHtml(commitsPreview)}</code></pre>
+Agent: <b>${escapeHtml(this.currentAgent)}</b> | Mode: <b>${escapeHtml(this.currentMode)}</b>
+`.trim();
+
+    await this.channel.sendMessage(this.allowedChatId, text, {
+      replyMarkup: this.getMainKeyboard(),
+    });
   }
 
   private async sendWorkspaceMenu(): Promise<void> {
@@ -608,18 +988,12 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
         callback_data: `ws:${i}`,
       },
     ]);
-
-    const kb: ChannelKeyboard & InlineKeyboardMarkup = {
-      rows: rows.map((r) =>
-        r.map((b) => ({ text: b.text, callbackData: b.callback_data, callback_data: b.callback_data }))
-      ),
-      inline_keyboard: rows,
-    };
+    rows.push([{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,
       t('select_workspace', this.language, { ws: escapeHtml(this.targetDir) }),
-      { replyMarkup: kb }
+      { replyMarkup: this.wrapKeyboard(rows) }
     );
   }
 
