@@ -12,18 +12,34 @@ export const LEGACY_CONFIG_DIR = path.join(os.homedir(), '.config', 'rumuze-edit
 export const AGENTGRAM_CONFIG_DIR = path.join(os.homedir(), '.config', 'agentgram');
 
 export function getGlobalConfigDir(): string {
-  if (fs.existsSync(AGENTGRAM_CONFIG_DIR) || !fs.existsSync(LEGACY_CONFIG_DIR)) {
+  const agentgramConfigFile = path.join(AGENTGRAM_CONFIG_DIR, 'config.json');
+  const legacyConfigFile = path.join(LEGACY_CONFIG_DIR, 'config.json');
+  if (fs.existsSync(agentgramConfigFile)) {
     return AGENTGRAM_CONFIG_DIR;
   }
-  return LEGACY_CONFIG_DIR;
+  if (fs.existsSync(legacyConfigFile)) {
+    return LEGACY_CONFIG_DIR;
+  }
+  return AGENTGRAM_CONFIG_DIR;
 }
 
 export function ensureConfigDirs(): void {
   const dir = getGlobalConfigDir();
   const stateDir = path.join(dir, 'state');
   try {
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-    if (!fs.existsSync(stateDir)) fs.mkdirSync(stateDir, { recursive: true, mode: 0o700 });
+    if (!fs.existsSync(AGENTGRAM_CONFIG_DIR)) fs.mkdirSync(AGENTGRAM_CONFIG_DIR, { recursive: true, mode: 0o700 });
+    if (!fs.existsSync(path.join(AGENTGRAM_CONFIG_DIR, 'state'))) {
+      fs.mkdirSync(path.join(AGENTGRAM_CONFIG_DIR, 'state'), { recursive: true, mode: 0o700 });
+    }
+
+    // Auto-migrate legacy configuration if found
+    const legacyConfig = path.join(LEGACY_CONFIG_DIR, 'config.json');
+    const agentgramConfig = path.join(AGENTGRAM_CONFIG_DIR, 'config.json');
+    if (fs.existsSync(legacyConfig) && !fs.existsSync(agentgramConfig)) {
+      try {
+        fs.copyFileSync(legacyConfig, agentgramConfig);
+      } catch {}
+    }
   } catch {
     // Ignore permission or creation race conditions
   }
