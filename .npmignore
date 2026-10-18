@@ -1,0 +1,13 @@
+.git/
+.github/
+tests/
+templates/.rumuze-edit.example.json
+*.log
+*.pid
+daemon.*
+vendor/
+node_modules/
+.DS_Store
+__pycache__/
+*.pyc
+*.pyo

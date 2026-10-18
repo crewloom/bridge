@@ -1,0 +1,33 @@
+# OS & IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Composer
+vendor/
+composer.lock
+
+# Rumuze Edit State & Secrets
+daemon.log
+daemon.err
+daemon.pid
+*.pid
+audit.log
+state/
+room_state.json
+gate.json
+.config/

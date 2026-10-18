@@ -1,0 +1,49 @@
+{
+  "name": "rumuze-edit",
+  "version": "1.0.0",
+  "description": "Control OpenCode and AI coding agents on your machine directly from Telegram with live streaming cards, interactive buttons, and security sandboxing.",
+  "main": "bin/rumuze-edit.js",
+  "bin": {
+    "rumuze-edit": "bin/rumuze-edit.js",
+    "rumuze": "bin/rumuze-edit.js"
+  },
+  "files": [
+    "bin/",
+    "core/",
+    "templates/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "node bin/rumuze-edit.js start",
+    "status": "node bin/rumuze-edit.js status",
+    "init": "node bin/rumuze-edit.js init",
+    "test": "python3 -m unittest discover -s tests",
+    "prepack": "rm -rf core/__pycache__ tests/__pycache__"
+  },
+  "keywords": [
+    "opencode",
+    "telegram",
+    "ai-agent",
+    "claude-code",
+    "coding-agent",
+    "developer-tools",
+    "remote-control",
+    "terminal",
+    "rumuze",
+    "live-coding"
+  ],
+  "author": "Rumuze <support@rumuze.com> (https://rumuze.com)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rumuze/rumuze-edit.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rumuze/rumuze-edit/issues"
+  },
+  "homepage": "https://github.com/rumuze/rumuze-edit#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

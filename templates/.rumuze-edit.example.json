@@ -1,0 +1,8 @@
+{
+  "default_agent": "build",
+  "default_model": "opencode/deepseek-v4.1-flash-free",
+  "deny_patterns": [
+    "php artisan migrate:fresh",
+    "composer dump-autoload"
+  ]
+}
