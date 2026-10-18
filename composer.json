@@ -25,7 +25,7 @@
   },
   "autoload": {
     "psr-4": {
-      "Rumuze\\Edit\\": "src/"
+      "Rumuze\\Edit\\": "laravel/"
     }
   },
   "bin": [

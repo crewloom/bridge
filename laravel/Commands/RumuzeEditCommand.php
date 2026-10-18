@@ -18,9 +18,9 @@ class RumuzeEditCommand extends Command
         $action = $this->argument('action');
         $isDaemon = $this->option('daemon');
 
-        $binPath = realpath(__DIR__ . '/../../bin/rumuze-edit');
+        $binPath = realpath(__DIR__ . '/../../bin/agentgram') ?: realpath(__DIR__ . '/../../bin/rumuze-edit');
         if (!$binPath || !file_exists($binPath)) {
-            $this->error('Rumuze Edit CLI binary not found.');
+            $this->error('AgentGram CLI binary not found.');
             return 1;
         }
 

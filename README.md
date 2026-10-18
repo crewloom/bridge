@@ -9,8 +9,8 @@
 [![CI Matrix](https://img.shields.io/github/actions/workflow/status/rumuze/agentgram/ci.yml?branch=main&label=CI%20matrix&style=flat-square&logo=githubactions&logoColor=white)](https://github.com/rumuze/agentgram/actions)
 [![GitHub release](https://img.shields.io/github/v/release/rumuze/agentgram?style=flat-square&color=3b82f6&logo=github)](https://github.com/rumuze/agentgram/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.9%20..%203.14-yellow.svg?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![Node.js](https://img.shields.io/badge/Node.js-18%20..%2022-green.svg?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-18%20..%2026-green.svg?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 
 <p align="center">
   <a href="https://www.npmjs.com/package/agentgram"><b>📦 View on NPM</b></a> •
@@ -32,7 +32,7 @@ Developers shouldn't be chained to their desks waiting for an AI agent to finish
 * ⚡ **Auto Mode:** Enable full autonomy for routine tasks; safety policies automatically intercept destructive commands.
 * 🛡️ **Enterprise Prompt Injection Shield:** Multi-layer defense against role hijacking, jailbreaks, delimiter evasion, and malicious prompt injections.
 * 🌐 **Multi-Machine & Server Ops:** Run operations, SSH jump-host connections, deploy scripts (`pinpoint-go`), and remote log diagnostics directly from your phone.
-* ⚡ **Zero External Dependencies:** Built with pure Node.js and Python Standard Library (`stdlib`). No bloated `node_modules` and **zero `pip install`** needed!
+* ⚡ **Zero Runtime Dependencies:** 100% Pure Node.js & TypeScript with zero external runtime dependencies. Ultra-lightweight and blazingly fast!
 
 ---
 

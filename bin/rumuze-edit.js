@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /**
- * Rumuze Edit (Legacy alias for AgentGram)
- * Forwarding all commands directly to AgentGram.
+ * Backward-compatible rumuze-edit forwarder
  */
-
-require('./agentgram.js');
+const path = require('node:path');
+require(path.join(__dirname, 'agentgram.js'));
