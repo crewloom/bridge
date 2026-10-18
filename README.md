@@ -29,7 +29,7 @@ Developers shouldn't be glued to their desks waiting for an AI agent to finish m
 
 **Rumuze Edit** turns your Telegram into a high-powered developer mission control:
 * 📲 **Live Streaming Card:** Watch the agent's progress update in real-time right in your Telegram chat (refreshes smoothly every ~2.5s).
-* 🔘 **Interactive Buttons:** Approve/reject file edits, pick AI models, switch agents, and answer multi-choice agent questions with single clicks.
+* 🔘 **Interactive Buttons:** Approve/reject file edits with **[Allow Once]** or **[Always Allow]** buttons, toggle **Auto Mode**, pick AI models, switch agents, and answer multi-choice agent questions with single clicks.
 * 🔒 **Zero-Trust Security Sandbox:** Path isolation prevents escaping project directories; dangerous commands (`rm -rf /`, `sudo`, reading SSH keys) are blocked by default.
 * ⚡ **Zero External Dependencies:** Built with pure Node.js and Python Standard Library (`stdlib`). No bloated `node_modules` and **zero `pip install`** needed!
 * 🚀 **Universal Package:** Install via **NPM** (`npx rumuze-edit`) or **Composer / Laravel** (`composer require --dev rumuze/edit`).

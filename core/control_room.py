@@ -140,6 +140,7 @@ def new_run(session_id, agent, model, mode, user_msg_id=None):
         "busy": False, "done": False, "error": None,
         "card_id": None, "last_edit": 0.0, "dirty": True, "last_card": "",
         "perms": {}, "final_sent": False, "retry": None, "retry_notified": False, "waiting": False, "retry_msg": None, "questions": {},
+        "auto_approved_perms": set(),
     }
 
 
@@ -267,7 +268,7 @@ def final_answer(run):
 
 
 def decide_permission(props, mode):
-    """Return (decision, reason): 'reject' or 'ask'. Never returns an approval."""
+    """Return (decision, reason): 'reject', 'allow', or 'ask'."""
     perm = str(props.get("permission") or "")
     patterns = " ".join(str(x) for x in (props.get("patterns") or []))
     meta = props.get("metadata") or {}
@@ -277,6 +278,8 @@ def decide_permission(props, mode):
         return "reject", "السياسة ترفض هذا الطلب"
     if mode == "read" and perm in WRITE_PERMISSIONS:
         return "reject", "وضع القراءة لا يسمح بالتعديل"
+    if mode == "auto":
+        return "allow", "auto mode enabled"
     return "ask", ""
 
 
@@ -459,17 +462,22 @@ def question_view(entry):
     return "\n".join(lines), keyboard(rows)
 
 
-def permission_text(props, agent):
+def permission_text(props, agent, lang="en"):
     meta = props.get("metadata") or {}
     what = meta.get("command") or ", ".join(str(x) for x in (props.get("patterns") or [])) or "—"
-    return (f"🔐 <b>Permission Request</b> — {esc(props.get('permission', '?'))}\n"
-            f"Agent: {esc(agent)}\n<pre>{esc(clip(what, 700))}</pre>\n"
-            f"Approval is valid once. Expires in 10 minutes if unapproved.")
+    perm = props.get("permission", "?")
+    return t("perm_req", lang, perm=esc(perm), agent=esc(agent), cmd=esc(clip(what, 700)))
 
 
-def permission_keyboard(perm_id):
-    return keyboard([[("✅ Allow Once", f"pm:o:{perm_id}"), ("⛔ Reject", f"pm:r:{perm_id}")],
-                     [("🛑 Stop Session", "stop")]])
+def permission_keyboard(perm_id, lang="en"):
+    btn_once = t("btn_allow_once", lang)
+    btn_always = t("btn_allow_always", lang)
+    btn_reject = t("btn_reject", lang)
+    btn_stop = t("btn_stop_session", lang)
+    return keyboard([
+        [(btn_once, f"pm:o:{perm_id}"), (btn_always, f"pm:a:{perm_id}")],
+        [(btn_reject, f"pm:r:{perm_id}"), (btn_stop, "stop")]
+    ])
 
 
 def parse_callback(data):
@@ -478,7 +486,7 @@ def parse_callback(data):
     if len(d) > 64:
         return None
     if d in ("stop", "new", "st", "diff", "hp", "menu:ag", "menu:md", "menu:mo", "menu:se", "menu:sk", "menu:lg",
-             "mo:read", "mo:build", "pp:an", "pp:ig", "pp:fa", "pp:go", "sk:clear", "rt:wait", "rt:end", "rt:later", "us", "sq", "sc:all", "ho"):
+             "mo:read", "mo:build", "mo:auto", "pp:an", "pp:ig", "pp:fa", "pp:go", "sk:clear", "rt:wait", "rt:end", "rt:later", "us", "sq", "sc:all", "ho"):
         return d, None
     m = re.match(r"^(ag|md|se|pg|sk|sp|lang):([A-Za-z0-9_.:\-/]+)$", d)
     if m:
@@ -507,7 +515,7 @@ def parse_callback(data):
     m = re.match(r"^pp:fx:([ae][A-Za-z0-9]{1,12})$", d)
     if m:
         return "pp:fx", m.group(1)
-    m = re.match(r"^pm:([or]):(per_[A-Za-z0-9]+)$", d)
+    m = re.match(r"^pm:([oar]):(per_[A-Za-z0-9]+)$", d)
     if m and PERM_ID_RE.match(m.group(2)):
         return "pm:" + m.group(1), m.group(2)
     return None
@@ -676,6 +684,7 @@ class Room:
         self.state = self._load()
         self.lang = self.state.get("lang") or CFG.language or "en"
         self.policy = SecurityPolicy(TARGET_DIR, custom_patterns=getattr(CFG, "deny_patterns", None))
+        self.session_auto_approved = {}
         self._agents = None
         self._models = None
         self._skills = None
@@ -879,10 +888,10 @@ class Room:
 
     def build_mode(self):
         cur = self.state["mode"]
-        return (f"🔒 <b>Execution Mode</b> (Current: <b>{esc(cur)}</b>)\n"
-                "read: Refuses file modifications · build: Modifications permitted with explicit approval buttons.",
+        return (self.t("select_mode", mode=cur),
                 keyboard([[(("● " if cur == "read" else "") + "🔒 read", "mo:read"),
-                           (("● " if cur == "build" else "") + "🔓 build", "mo:build")]]))
+                           (("● " if cur == "build" else "") + "🔓 build", "mo:build"),
+                           (("● " if cur == "auto" else "") + "⚡ auto", "mo:auto")]]))
 
     def build_sessions(self):
         try:
@@ -1293,13 +1302,29 @@ class Room:
         if decision == "reject":
             self._reply_permission(pid, "reject", reason)
             run["perms"][pid]["state"] = "rejected"
-            self.send(f"⛔ رُفض تلقائيًا: {esc(props.get('permission', '?'))} — {esc(reason)}")
+            self.send(f"⛔ {self.t('perm_rejected')}: {esc(props.get('permission', '?'))} — {esc(reason)}")
             legacy.log("room_permission_auto_reject", chat_id=self.chat_id,
                        result=f"{props.get('permission')} {reason}")
             return
+
+        perm_type = props.get("permission", "?")
+        sid = run.get("session_id")
+        session_allowed = self.session_auto_approved.get(sid, set()) if sid else set()
+        if decision == "allow" or perm_type in run.get("auto_approved_perms", set()) or perm_type in session_allowed:
+            self._reply_permission(pid, "always", "")
+            run["perms"][pid]["state"] = "allowed_always"
+            run["perms"][pid]["at"] = self.clock()
+            run["dirty"] = True
+            legacy.log("room_permission_auto_allowed", chat_id=self.chat_id,
+                       result=f"{perm_type} auto-approved")
+            return
+
         run["perms"][pid]["state"] = "pending"
         run["perms"][pid]["at"] = self.clock()
-        run["perms"][pid]["msg"] = self.send(permission_text(props, run["agent"]), permission_keyboard(pid))
+        run["perms"][pid]["msg"] = self.send(
+            permission_text(props, run["agent"], self.lang),
+            permission_keyboard(pid, self.lang)
+        )
         run["dirty"] = True
 
     # ---- agent questions -----------------------------------------------------------------
@@ -1416,10 +1441,10 @@ class Room:
                         pass
                     v["state"] = "rejected"
                     if v.get("msg"):
-                        self.edit(v["msg"], "⌛ انتهت مهلة طلب الصلاحية — رُفض.", None)
+                        self.edit(v["msg"], self.t("perm_expired"), None)
             for entry in run.get("questions", {}).values():
                 if entry["state"] == "pending" and now - entry["at"] > PERMISSION_TTL:
-                    self._question_reject(entry, "⌛ انتهت مهلة السؤال — رُفض.")
+                    self._question_reject(entry, self.t("question_expired"))
 
     def _finish(self, run):
         if run["final_sent"]:
@@ -1757,7 +1782,7 @@ class Room:
             return self.send(f"📂 الجلسة: <code>{esc(arg[:18])}</code> — اكتب رسالتك للاستكمال.")
         if kind in ("qa", "qt", "qd", "qc", "qr"):
             return self.question_button(cb_id, kind, arg)
-        if kind in ("pm:o", "pm:r"):
+        if kind in ("pm:o", "pm:a", "pm:r"):
             return self.permission_button(cb_id, kind, arg, msg)
         if kind == "pp:ig":
             self.answer_cb(cb_id, "تم التجاهل")
@@ -1779,20 +1804,45 @@ class Room:
             run = self.run
             entry = run["perms"].get(perm_id) if run else None
             if not entry or entry["state"] != "pending":
-                return self.answer_cb(cb_id, "الطلب لم يعد معلّقًا")
-            allow = kind == "pm:o"
-            self._reply_permission(perm_id, "once" if allow else "reject", "" if allow else "rejected by owner")
-            entry["state"] = "allowed" if allow else "rejected"
-            self.answer_cb(cb_id, "تمت الموافقة مرة واحدة" if allow else "تم الرفض")
+                return self.answer_cb(cb_id, self.t("perm_expired"))
+
+            perm_type = entry["props"].get("permission", "?")
+            what = clip((entry["props"].get("metadata") or {}).get("command") or
+                        ", ".join(map(str, entry["props"].get("patterns") or [])), 200)
+
+            if kind == "pm:a":
+                # Always Allow
+                self._reply_permission(perm_id, "always", "")
+                entry["state"] = "allowed_always"
+                if run:
+                    run.setdefault("auto_approved_perms", set()).add(perm_type)
+                    sid = run.get("session_id")
+                    if sid:
+                        self.session_auto_approved.setdefault(sid, set()).add(perm_type)
+                toast = self.t("perm_always_toast")
+                label = f"{self.t('perm_allowed_always')} — {esc(perm_type)}: <code>{esc(what)}</code>"
+                log_result = f"always {perm_type}"
+            elif kind == "pm:o":
+                # Allow Once
+                self._reply_permission(perm_id, "once", "")
+                entry["state"] = "allowed"
+                toast = self.t("perm_allowed")
+                label = f"{self.t('perm_allowed')} — {esc(perm_type)}: <code>{esc(what)}</code>"
+                log_result = f"once {perm_type}"
+            else:
+                # Reject
+                self._reply_permission(perm_id, "reject", "rejected by owner")
+                entry["state"] = "rejected"
+                toast = self.t("perm_rejected")
+                label = f"{self.t('perm_rejected')} — {esc(perm_type)}: <code>{esc(what)}</code>"
+                log_result = f"reject {perm_type}"
+
+            self.answer_cb(cb_id, toast)
             if entry.get("msg"):
-                what = clip((entry["props"].get("metadata") or {}).get("command") or
-                            ", ".join(map(str, entry["props"].get("patterns") or [])), 200)
-                self.edit(entry["msg"], f"{'✅ سُمح مرة' if allow else '⛔ رُفض'} — "
-                                        f"{esc(entry['props'].get('permission', '?'))}: <code>{esc(what)}</code>",
-                          None)
-            run["dirty"] = True
-            legacy.log("room_permission", chat_id=self.chat_id,
-                       result=f"{'once' if allow else 'reject'} {entry['props'].get('permission')}")
+                self.edit(entry["msg"], label, None)
+            if run:
+                run["dirty"] = True
+            legacy.log("room_permission", chat_id=self.chat_id, result=log_result)
 
     def retry_choice(self, cb_id, kind, msg):
         with self.lock:
