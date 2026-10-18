@@ -1,6 +1,6 @@
 {
   "name": "agentgram",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Turn your Telegram into a live AI Agent Control Room. Monitor coding runs, stream real-time logs, approve/reject file diffs, and control multi-machine ops from your phone.",
   "main": "bin/agentgram.js",
   "bin": {
