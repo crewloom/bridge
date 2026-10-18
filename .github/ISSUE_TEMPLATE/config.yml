@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Community Discussions & Questions
+    url: https://github.com/rumuze/rumuze-edit/discussions
+    about: Please ask questions and share ideas in our GitHub Discussions.
+  - name: 🔒 Security Vulnerability Reporting
+    url: https://github.com/rumuze/rumuze-edit/security/policy
+    about: Privately report a security vulnerability to the core engineering team.

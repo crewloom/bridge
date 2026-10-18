@@ -3,6 +3,7 @@
 > **Remote AI Coding Agent Bridge & Live Telegram Control Room**  
 > Control [OpenCode](https://opencode.ai), AI coding agents, and terminal tools on your local machine or VPS directly from your phone via Telegram.
 
+[![CI](https://github.com/rumuze/rumuze-edit/actions/workflows/ci.yml/badge.svg)](https://github.com/rumuze/rumuze-edit/actions/workflows/ci.yml)
 [![npm version](https://img.shields.io/npm/v/rumuze-edit.svg?style=flat-square)](https://www.npmjs.com/package/rumuze-edit)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.9+-yellow.svg?style=flat-square)](https://python.org)
@@ -16,11 +17,43 @@
 Developers shouldn't be glued to their desks waiting for an AI agent to finish modifying files or running test suites. 
 
 **Rumuze Edit** turns your Telegram into a high-powered developer mission control:
-* 📲 **Live Streaming Card:** Watch the agent's progress update in real-time right in your Telegram chat.
+* 📲 **Live Streaming Card:** Watch the agent's progress update in real-time right in your Telegram chat (refreshes smoothly every ~2.5s).
 * 🔘 **Interactive Buttons:** Approve/reject file edits, pick AI models, switch agents, and answer multi-choice agent questions with single clicks.
 * 🔒 **Zero-Trust Security Sandbox:** Path isolation prevents escaping project directories; dangerous commands (`rm -rf /`, `sudo`, reading SSH keys) are blocked by default.
 * ⚡ **Zero External Dependencies:** Built with pure Node.js and Python Standard Library (`stdlib`). No bloated `node_modules` and **zero `pip install`** needed!
 * 🚀 **Universal Package:** Install via **NPM** (`npx rumuze-edit`) or **Composer / Laravel** (`composer require --dev rumuze/edit`).
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart LR
+    User["📱 Mobile / Telegram App"] <-->|Bot API / Webhook| Daemon["⚡ Rumuze Edit Daemon"]
+    Daemon <-->|Loopback SSE / 127.0.0.1| Server["🤖 OpenCode Server"]
+    Server <-->|Sandboxed Execution| Project["📂 Project Files & Git"]
+```
+
+### The Telegram Experience
+
+```text
+┌────────────────────────────────────────────────────────┐
+│ ⚡ Rumuze Edit · Live Mission Control                   │
+│                                                        │
+│ Agent: 🧠 build | Model: 🤖 space-bunny-free           │
+│ Status: 🟢 Executing bash (npm test)                   │
+│ Step: 4/12 · ⏳ 14s · 📝 3 files modified              │
+│                                                        │
+│ ────────────────────────────────────────────────────── │
+│ > PASS tests/auth.test.js                              │
+│ > PASS tests/api.test.js                               │
+│ > All 14 tests passing                                 │
+│ ────────────────────────────────────────────────────── │
+│                                                        │
+│ [ ⏹ Stop ]      [ 📤 Diff ]      [ 📊 Status ]        │
+│ [ 🧠 Agents ]   [ 🤖 Models ]    [ 🔒 Mode ]           │
+└────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -42,10 +75,10 @@ The wizard will:
 To launch the control room:
 
 ```bash
-# Foreground
+# Run in foreground
 npx rumuze-edit start
 
-# Or run in the background as a detached daemon
+# Or run in background as a detached daemon
 npx rumuze-edit start --daemon
 ```
 
@@ -140,6 +173,19 @@ Rumuze Edit is engineered with a strict security model:
 
 ---
 
+## ❓ Frequently Asked Questions (FAQ)
+
+### Can I run this on a remote VPS?
+**Yes!** Install Rumuze Edit on your VPS or cloud instance, run `npx rumuze-edit start --daemon`, and you can control server maintenance or fixes directly from Telegram without opening an SSH client.
+
+### Does it require a paid Telegram Bot account?
+**No.** It uses standard free Telegram bots created in seconds through [@BotFather](https://t.me/botfather).
+
+### Can multiple developers share the same bot?
+By design, each Rumuze Edit daemon is bound to a single user (`ALLOWED_CHAT_ID`) for ironclad security. If multiple team members want to use it, each developer can run their own daemon with their own bot token.
+
+---
+
 ## 🇸🇦 الدليل بالعربية (Arabic Guide)
 
 **رموز إيديت (Rumuze Edit)** هي أداة مفتوحة المصدر لربط وكلاء الذكاء الاصطناعي (مثل OpenCode و Claude Code) بحسابك على تليجرام، لتتحكم في مشاريعك وتنفذ أوامر وتعدل الأكواد مباشرة من موبايلك.
@@ -162,6 +208,14 @@ npx rumuze-edit start
 # أو التشغيل في الخلفية كـ Service
 npx rumuze-edit service install
 ```
+
+---
+
+## 🤝 Community & Contributing
+
+* Read our [Contributing Guide](CONTRIBUTING.md) to get started.
+* Review our [Code of Conduct](CODE_OF_CONDUCT.md).
+* Report security concerns following our [Security Policy](SECURITY.md).
 
 ---
 

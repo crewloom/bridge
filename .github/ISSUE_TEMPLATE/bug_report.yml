@@ -1,0 +1,48 @@
+name: 🐛 Bug Report
+description: File a bug report to help us improve Rumuze Edit
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue! Please provide as much context as possible.
+  - type: input
+    id: environment
+    attributes:
+      label: Environment Info
+      description: What OS, Node version, and Python version are you using?
+      placeholder: e.g. macOS Sonoma 14.5 / Ubuntu 22.04 | Python 3.11.4 | Node v20.10.0
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Run 'npx rumuze-edit start'
+        2. Send message '...' on Telegram
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs & Terminal Output
+      description: Please copy and paste any relevant logs from `~/.config/rumuze-edit/daemon.log` or terminal.
+      render: shell

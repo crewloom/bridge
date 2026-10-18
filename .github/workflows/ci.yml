@@ -1,0 +1,46 @@
+name: CI & Quality Assurance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }} | Node ${{ matrix.node-version }} | ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+        node-version: ["18.x", "20.x", "22.x"]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Run Python Unit Tests
+        run: |
+          python3 -m unittest discover -s tests -v
+
+      - name: Test Node.js CLI smoke test
+        run: |
+          node bin/rumuze-edit.js --version
+          node bin/rumuze-edit.js --help
+          node bin/rumuze-edit.js status
+
+      - name: Validate syntax compilation
+        run: |
+          python3 -m py_compile core/*.py
