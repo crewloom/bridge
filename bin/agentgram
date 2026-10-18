@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# AgentGram CLI wrapper for Bash and Composer environments
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(dirname "$DIR")"
+
+if command -v node >/dev/null 2>&1; then
+    exec node "$DIR/agentgram.js" "$@"
+elif command -v python3 >/dev/null 2>&1; then
+    exec python3 "$ROOT/core/control_room.py" "$@"
+else
+    echo "Error: Neither Node.js nor Python 3 was found in your PATH." >&2
+    exit 1
+fi

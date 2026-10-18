@@ -1,38 +1,38 @@
-# ⚡ Rumuze Edit
+# ⚡ AgentGram
 
-> **Remote AI Coding Agent Bridge & Live Telegram Control Room**  
-> Control [OpenCode](https://opencode.ai), AI coding agents, and terminal tools on your local machine or VPS directly from your phone via Telegram.
+> **Turn your Telegram into a live AI Agent Control Room & Ops Mission Control**  
+> Control [OpenCode](https://opencode.ai), AI coding agents, and terminal operations on your machine or VPS directly from your phone via Telegram.
 
-[![npm version](https://img.shields.io/npm/v/rumuze-edit.svg?style=flat-square&logo=npm&color=CB3837)](https://www.npmjs.com/package/rumuze-edit)
-[![npm package size](https://img.shields.io/badge/package%20size-44.7%20kB-22c55e?style=flat-square&logo=npm)](https://www.npmjs.com/package/rumuze-edit)
-[![dependencies](https://img.shields.io/badge/dependencies-0%20(zero)-success.svg?style=flat-square)](https://www.npmjs.com/package/rumuze-edit)
-[![CI Matrix](https://img.shields.io/github/actions/workflow/status/rumuze/rumuze-edit/ci.yml?branch=main&label=CI%20matrix&style=flat-square&logo=githubactions&logoColor=white)](https://github.com/rumuze/rumuze-edit/actions)
-[![Packagist](https://img.shields.io/badge/Packagist-rumuze%2Fedit-f28d1a.svg?style=flat-square&logo=packagist&logoColor=white)](https://packagist.org/packages/rumuze/edit)
-[![GitHub release](https://img.shields.io/github/v/release/rumuze/rumuze-edit?style=flat-square&color=3b82f6&logo=github)](https://github.com/rumuze/rumuze-edit/releases/latest)
+[![npm version](https://img.shields.io/npm/v/agentgram.svg?style=flat-square&logo=npm&color=CB3837)](https://www.npmjs.com/package/agentgram)
+[![npm package size](https://img.shields.io/badge/package%20size-52%20kB-22c55e?style=flat-square&logo=npm)](https://www.npmjs.com/package/agentgram)
+[![dependencies](https://img.shields.io/badge/dependencies-0%20(zero)-success.svg?style=flat-square)](https://www.npmjs.com/package/agentgram)
+[![CI Matrix](https://img.shields.io/github/actions/workflow/status/rumuze/agentgram/ci.yml?branch=main&label=CI%20matrix&style=flat-square&logo=githubactions&logoColor=white)](https://github.com/rumuze/agentgram/actions)
+[![GitHub release](https://img.shields.io/github/v/release/rumuze/agentgram?style=flat-square&color=3b82f6&logo=github)](https://github.com/rumuze/agentgram/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.9%20..%203.14-yellow.svg?style=flat-square&logo=python&logoColor=white)](https://python.org)
 [![Node.js](https://img.shields.io/badge/Node.js-18%20..%2022-green.svg?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/rumuze-edit"><b>📦 View on NPM</b></a> •
-  <a href="https://packagist.org/packages/rumuze/edit"><b>🐘 View on Packagist</b></a> •
-  <a href="https://github.com/rumuze/rumuze-edit/releases/latest"><b>🏷️ Release Notes (v1.0.3)</b></a> •
+  <a href="https://www.npmjs.com/package/agentgram"><b>📦 View on NPM</b></a> •
+  <a href="https://github.com/rumuze/agentgram/releases/latest"><b>🏷️ Releases</b></a> •
   <a href="#-quick-start"><b>🚀 Quick Start</b></a> •
+  <a href="#-telegram-experience"><b>📱 Features</b></a> •
   <a href="#-frequently-asked-questions-faq"><b>❓ FAQ</b></a>
 </p>
 
 ---
 
-## 🌟 Why Rumuze Edit?
+## 🌟 Why AgentGram?
 
-Developers shouldn't be glued to their desks waiting for an AI agent to finish modifying files or running test suites. 
+Developers shouldn't be chained to their desks waiting for an AI agent to finish modifying code, executing test suites, or running remote deployment scripts.
 
-**Rumuze Edit** turns your Telegram into a high-powered developer mission control:
-* 📲 **Live Streaming Card:** Watch the agent's progress update in real-time right in your Telegram chat (refreshes smoothly every ~2.5s).
-* 🔘 **Interactive Buttons:** Approve/reject file edits with **[Allow Once]** or **[Always Allow]** buttons, toggle **Auto Mode**, pick AI models, switch agents, and answer multi-choice agent questions with single clicks.
-* 🔒 **Zero-Trust Security Sandbox:** Path isolation prevents escaping project directories; dangerous commands (`rm -rf /`, `sudo`, reading SSH keys) are blocked by default.
+**AgentGram** turns Telegram into a mobile developer cockpit:
+* 📲 **Live Streaming Mission Control:** Real-time progress updates inside a dynamic Telegram message (updates smoothly every ~2.5s with tools, steps, and output tails).
+* 🔘 **One-Tap Permission Buttons:** Approve or reject file edits and commands with `[ ✅ Allow Once ]`, `[ ♾️ Always Allow ]`, or `[ ⛔ Reject ]`.
+* ⚡ **Auto Mode:** Enable full autonomy for routine tasks; safety policies automatically intercept destructive commands.
+* 🛡️ **Enterprise Prompt Injection Shield:** Multi-layer defense against role hijacking, jailbreaks, delimiter evasion, and malicious prompt injections.
+* 🌐 **Multi-Machine & Server Ops:** Run operations, SSH jump-host connections, deploy scripts (`pinpoint-go`), and remote log diagnostics directly from your phone.
 * ⚡ **Zero External Dependencies:** Built with pure Node.js and Python Standard Library (`stdlib`). No bloated `node_modules` and **zero `pip install`** needed!
-* 🚀 **Universal Package:** Install via **NPM** (`npx rumuze-edit`) or **Composer / Laravel** (`composer require --dev rumuze/edit`).
 
 ---
 
@@ -40,16 +40,17 @@ Developers shouldn't be glued to their desks waiting for an AI agent to finish m
 
 ```mermaid
 flowchart LR
-    User["📱 Mobile / Telegram App"] <-->|Bot API / Webhook| Daemon["⚡ Rumuze Edit Daemon"]
+    User["📱 Mobile / Telegram App"] <-->|Bot API / Webhook| Daemon["⚡ AgentGram Daemon"]
     Daemon <-->|Loopback SSE / 127.0.0.1| Server["🤖 OpenCode Server"]
     Server <-->|Sandboxed Execution| Project["📂 Project Files & Git"]
+    Daemon <-->|Authorized Ops / SSH| Remote["🖥️ Remote VPS / Server"]
 ```
 
 ### The Telegram Experience
 
 ```text
 ┌────────────────────────────────────────────────────────┐
-│ ⚡ Rumuze Edit · Live Mission Control                   │
+│ ⚡ AgentGram · Live Mission Control                    │
 │                                                        │
 │ Agent: 🧠 build | Model: 🤖 space-bunny-free           │
 │ Status: 🟢 Executing bash (npm test)                   │
@@ -70,97 +71,101 @@ flowchart LR
 
 ## 🚀 Quick Start
 
-### 1. Via NPM (Global Installation)
+### 1. Instant Run via NPX (Zero Install)
 
-Install globally across your machine:
-
-```bash
-npm install -g rumuze-edit
-
-# Initialize in any repo
-rumuze-edit init
-
-# Start control room
-rumuze-edit start
-```
-
-### 2. Via NPX (Zero-Install Instant Runner)
-
-Run immediately in any project without installing globally:
+Run immediately in any repository without installing globally:
 
 ```bash
-# Launch interactive pairing wizard
-npx rumuze-edit init
+# Launch interactive pairing wizard (takes 30 seconds)
+npx agentgram init
 
-# Run in foreground
-npx rumuze-edit start
+# Start the live control room
+npx agentgram start
 
 # Or run in background as a detached daemon
-npx rumuze-edit start --daemon
+npx agentgram start --daemon
 ```
 
----
+### 2. Global Installation
 
-### 2. Via Composer / Laravel (For PHP & Laravel teams)
-
-Install as a development dependency:
+Install globally across your development machine or VPS:
 
 ```bash
-composer require --dev rumuze/edit
+npm install -g agentgram
+
+# Initialize pairing in any repo
+agentgram init
+
+# Start control room
+agentgram start
 ```
 
-Run directly via Composer:
+### 3. Running as a Persistent System Service (Auto-Start on Boot)
+
+Want AgentGram to run 24/7 on your machine or cloud VPS?
+
 ```bash
-./vendor/bin/rumuze-edit init
-./vendor/bin/rumuze-edit start
+# On macOS (installs to ~/Library/LaunchAgents/com.agentgram.plist)
+# On Linux (installs to ~/.config/systemd/user/agentgram.service)
+npx agentgram service install
+
+# Check service status
+npx agentgram service status
 ```
 
-Or inside any **Laravel** application via Artisan:
-```bash
-php artisan rumuze:edit init
-php artisan rumuze:edit start --daemon
-```
-
----
-
-### 4. Via Docker Compose (Headless VPS & Servers)
+### 4. Via Docker Compose (Headless Cloud VPS)
 
 Run 24/7 on any cloud server or VPS:
 
 ```bash
-# Clone and enter directory
-git clone https://github.com/rumuze/rumuze-edit.git && cd rumuze-edit
-
-# Run with your credentials
+git clone https://github.com/rumuze/agentgram.git && cd agentgram
 TG_BOT_TOKEN="your_bot_token" TG_ALLOWED_CHAT_ID="your_chat_id" docker compose up -d
 ```
 
 ---
 
-## 🎮 Telegram Controls & Features
+## 🎮 Telegram Controls & Commands
 
-Once connected, your Telegram bot becomes your project dashboard:
+Once connected, your Telegram chat becomes your project mission control:
 
-| Command / Action | Description |
+| Command / Control | Description |
 |---|---|
 | **Live Status Card** | Edits automatically every ~2.5s showing active tools, steps, and output tails |
-| **Permission Buttons** | Any tool requiring approval (bash, write, edit) renders inline buttons: `[Once] [Reject]` |
+| **Interactive Approvals** | Commands requiring approval render inline buttons: `[ ✅ Allow Once ]`, `[ ♾️ Always Allow ]`, `[ ⛔ Reject ]` |
 | **Interactive Questions** | Agent questions appear as clickable buttons (single-choice, multi-select, or custom text) |
-| `/agents` | Switch between active agents (e.g., `build`, `delegate`, `code-review`) |
-| `/models` | Select provider and model on the fly |
-| `/mode` | Toggle between `read` (read-only diagnosis) and `build` (active file modification) |
-| `/diff` | Get a summary of all unstaged and staged code changes in the project |
-| `/usage` | View token consumption, free tier limits, and countdown timers |
+| `/mode` | Switch execution mode: `read` (read-only diagnosis), `build` (interactive approval), or `auto` (autonomous execution) |
+| `/agents` | Switch active agent persona on the fly (e.g. `build`, `delegate`, `code-review`) |
+| `/models` | Switch LLM provider and model dynamically |
+| `/diff` | Get a condensed git diff summary of unstaged and staged changes |
+| `/usage` | View token usage, quota renewal countdowns, and rate limits |
 | `/stop` | Immediately interrupt and terminate the running agent process |
-| `/sync` | Fast-forward git sync (`git pull --ff-only`) if the working tree is clean |
+| `/lang` | Toggle between English and Arabic UI |
+
+---
+
+## 🔒 Security Sandboxing & Prompt Injection Shield
+
+AgentGram is engineered with enterprise zero-trust principles:
+
+1. **🛡️ Advanced Prompt Injection Defense:**
+   - **Role Hijacking & Jailbreak Defense:** Detects and blocks imperative prompt overrides ("ignore previous instructions", "disregard prior directives", "DAN mode", "system override:", and Arabic variants "تجاهل التعليمات السابقة", "أنت الآن في وضع المطور").
+   - **System Boundary Isolation:** Blocks delimiter evasion and token spoofing (`</untrusted-report>`, `<system>`, `<|im_start|>`, `[INST] <<SYS>>`).
+   - **Unicode & Obfuscation Stripping:** Normalizes Unicode (NFKC) and strips zero-width/invisible evasion characters (`\u200B`, `\u200C`, `\uFEFF`, `\u2060`) and BiDi overrides (`\u202E`). Recursively inspects base64 payloads.
+   - **Data Exfiltration Defense:** Blocks markdown image (`![exfil](https://.../?token=)`) and HTML link exfiltration vectors.
+2. **🔐 Cryptographic Quarantine Envelopes:**
+   - External error logs, server alerts, and untrusted inputs are wrapped inside isolated blocks (`<untrusted-report id="...">`) signed with cryptographically random nonces (`secrets.token_hex(8)`).
+3. **🚫 Execution Blocklist:**
+   - Irreversible destructive host wiping is blocked by default (`rm -rf /`, `rm -rf ~`, `mkfs`, `shutdown`, `dd if=`).
+4. **👤 Single Chat ID Lock:** Every message and inline callback query validates `chat.id == ALLOWED_CHAT_ID`. Unknown users are ignored.
+5. **🔒 Loopback & Token Isolation:** OpenCode server runs strictly on `127.0.0.1` with a per-session randomized high-entropy password; bot token is saved with strict `0600` file permissions.
 
 ---
 
 ## 🛠️ CLI Reference
 
 ```text
-rumuze-edit <command> [options]
-npx rumuze-edit <command> [options]
+agentgram <command> [options]
+npx agentgram <command> [options]
 
 COMMANDS:
   init               Interactive setup wizard & automatic Telegram pairing
@@ -178,58 +183,11 @@ OPTIONS:
   --version, -v      Show version number
 ```
 
-### Running as a Persistent System Service
-Want Rumuze Edit to run automatically whenever your machine or server boots?
-
-```bash
-# On macOS (installs to ~/Library/LaunchAgents/com.rumuze.edit.plist)
-# On Linux (installs to ~/.config/systemd/user/rumuze-edit.service)
-npx rumuze-edit service install
-```
-
 ---
 
-## 🔒 Security Sandboxing & Prompt Injection Shield
+## 🤝 Contributing & Community
 
-Rumuze Edit is engineered with an enterprise-grade multi-layer security architecture:
-
-1. **🛡️ Advanced Prompt Injection Shield:**
-   - **Role Hijacking & Jailbreak Defense:** Actively detects and blocks imperative prompt overrides ("ignore previous instructions", "disregard prior directives", "DAN mode", "system override:", and Arabic variants "تجاهل التعليمات السابقة", "أنت الآن في وضع المطور").
-   - **System Boundary Isolation:** Prevents delimiter evasion and token spoofing (`</untrusted-report>`, `<system>`, `<|im_start|>`, `[INST] <<SYS>>`, ````system`).
-   - **Unicode & Obfuscation Neutralization:** Automatically normalizes Unicode (NFKC) and strips zero-width/invisible evasion characters (`\u200B`, `\u200C`, `\uFEFF`, `\u2060`) and BiDi overrides (`\u202E`). Recursively unpacks and inspects base64 payloads.
-   - **Data Exfiltration Defense:** Blocks markdown image (`![exfil](https://.../?token=)`) and HTML link exfiltration vectors.
-   - **Zero False Positives:** Built with contextual intent filters that distinguish malicious imperative overrides from legitimate developer tasks (e.g. `git commit -m "ignore previous errors"`, regex development, or security discussions).
-2. **🔐 Cryptographic Quarantine Envelopes:**
-   - External error logs, Pinpoint Ops traces, and untrusted inputs are wrapped inside isolated blocks (`<untrusted-report id="...">`) signed with cryptographically random nonces (`secrets.token_hex(8)`). All embedded tags are neutralized before injection.
-3. **🚫 Execution Blocklist:**
-   - Destructive commands (`rm -rf /`, `rm -rf ~`, `mkfs`, `dd`)
-   - Privilege escalation (`sudo`)
-   - Private SSH keys (`id_rsa`, `id_ed25519`, `.pem`, `.ppk`)
-   - Production secrets (`.env`, `.env.production`)
-   - Directory traversal (`../`) outside the target project boundary.
-4. **👤 Single Chat ID Lock:** Every message and inline callback query validates `chat.id == ALLOWED_CHAT_ID`. Unknown users are ignored.
-5. **🔒 Loopback & Token Isolation:** OpenCode server runs strictly on `127.0.0.1` with a per-session randomized high-entropy password; bot token is saved with strict `0600` file permissions.
-
----
-
-## ❓ Frequently Asked Questions (FAQ)
-
-### Can I run this on a remote VPS?
-**Yes!** Install Rumuze Edit on your VPS or cloud instance, run `npx rumuze-edit start --daemon`, and you can control server maintenance or fixes directly from Telegram without opening an SSH client.
-
-### Does it require a paid Telegram Bot account?
-**No.** It uses standard free Telegram bots created in seconds through [@BotFather](https://t.me/botfather).
-
-### Can multiple developers share the same bot?
-By design, each Rumuze Edit daemon is bound to a single user (`ALLOWED_CHAT_ID`) for ironclad security. If multiple team members want to use it, each developer can run their own daemon with their own bot token.
-
----
-
-## 🤝 Community & Contributing
-
-* Read our [Contributing Guide](CONTRIBUTING.md) to get started.
-* Review our [Code of Conduct](CODE_OF_CONDUCT.md).
-* Report security concerns following our [Security Policy](SECURITY.md).
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) and [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ---
 

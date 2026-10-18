@@ -677,15 +677,20 @@ def run_stats(days=1):
 
 
 class Room:
-    def __init__(self, tg, oc, chat_id, state_path=ROOM_STATE_PATH, clock=time.time):
+    def __init__(self, tg, oc, chat_id, state_path=ROOM_STATE_PATH, clock=time.time, proc=None, cfg=None):
         self.tg, self.oc, self.chat_id = tg, oc, str(chat_id)
+        self.proc = proc
+        self.cfg = cfg or CFG
+        self.target_dir = self.cfg.target_dir
         self.state_path, self.clock = state_path, clock
         self.lock = threading.RLock()
         self.run = None
         self.state = self._load()
-        self.lang = self.state.get("lang") or CFG.language or "en"
-        self.policy = SecurityPolicy(TARGET_DIR, custom_patterns=getattr(CFG, "deny_patterns", None))
+        self.lang = self.state.get("lang") or self.cfg.language or "en"
+        self.policy = SecurityPolicy(self.target_dir, custom_patterns=getattr(self.cfg, "deny_patterns", None))
         self.session_auto_approved = {}
+        if hasattr(self.cfg, "add_workspace"):
+            self.cfg.add_workspace(self.target_dir)
         self._agents = None
         self._models = None
         self._skills = None
@@ -977,18 +982,105 @@ class Room:
         else:
             self.show_menu(self.build_language)
 
+    def menu_workspaces(self, msg=None):
+        known = list(getattr(self.cfg, "workspaces", []) or [])
+        if self.target_dir not in known:
+            known.append(self.target_dir)
+        rows = []
+        for i, w in enumerate(known[:10]):
+            base = os.path.basename(w) or w
+            is_active = "🟢 " if w == self.target_dir else "📁 "
+            rows.append([(f"{is_active}{base}", f"ws:{i}")])
+        text = self.t("select_workspace", ws=self.target_dir)
+        kb = keyboard(rows, help_row=True)
+        if msg and msg.get("message_id"):
+            return self.edit(msg["message_id"], text, kb)
+        return self.send(text, kb)
+
+    def switch_workspace(self, target_path):
+        clean = target_path.strip().strip("'\"")
+        if not clean:
+            return self.menu_workspaces()
+
+        known = list(getattr(self.cfg, "workspaces", []) or [])
+        target = None
+        clean_lower = clean.lower()
+        for w in known:
+            base = os.path.basename(w).lower()
+            clean_base = base.replace("-", "").replace("_", "").replace(" ", "")
+            if clean_lower in (base, w.lower(), clean_base):
+                target = w
+                break
+
+        if not target:
+            target = os.path.realpath(os.path.expanduser(clean))
+
+        if not os.path.isdir(target):
+            return self.send(self.t("ws_not_found", path=clean))
+
+        if self.run and not self.run.get("done"):
+            return self.send(self.t("ws_busy", ws=os.path.basename(self.target_dir)))
+
+        if target == self.target_dir:
+            return self.send(f"ℹ️ أنت بالفعل في مساحة العمل: <code>{esc(target)}</code>")
+
+        if getattr(self, "proc", None):
+            try:
+                os.killpg(self.proc.pid, signal.SIGTERM)
+            except Exception:
+                try:
+                    self.proc.terminate()
+                except Exception:
+                    pass
+            self.proc = None
+
+        try:
+            self.proc, self.oc = start_server(target_dir=target)
+        except Exception as e:
+            return self.send(f"❌ تعذر تشغيل خادم OpenCode في المسار الجديد: {esc(str(e))}")
+
+        new_cfg = Config(target_dir=target)
+        self.cfg = new_cfg
+        self.target_dir = target
+        self.state_path = new_cfg.room_state_path
+        self.state = self._load()
+        self.policy = SecurityPolicy(target, custom_patterns=getattr(new_cfg, "deny_patterns", None))
+        if hasattr(self.cfg, "add_workspace"):
+            self.cfg.add_workspace(target)
+
+        global TARGET_DIR, CFG, SYSTEM_HEADER
+        TARGET_DIR = target
+        CFG = new_cfg
+        SYSTEM_HEADER = get_system_header(target)
+
+        try:
+            branch = subprocess.run(["git", "-C", target, "branch", "--show-current"],
+                                    capture_output=True, text=True, timeout=10).stdout.strip()
+            dirty = len(subprocess.run(["git", "-C", target, "status", "--porcelain"],
+                                       capture_output=True, text=True, timeout=10).stdout.splitlines())
+        except Exception:
+            branch, dirty = "?", "?"
+
+        name = os.path.basename(target) or target
+        msg = self.t("ws_changed", name=name, ws=target, branch=branch, dirty=dirty)
+        legacy.log("workspace_switched", target=target)
+        return self.send(msg, self.home_keyboard())
+
     def status_text(self):
         st = self.state
+        target = getattr(self, "target_dir", TARGET_DIR)
         try:
-            dirty = len(subprocess.run(["git", "-C", TARGET_DIR, "status", "--porcelain"],
+            dirty = len(subprocess.run(["git", "-C", target, "status", "--porcelain"],
                                        capture_output=True, text=True, timeout=15).stdout.splitlines())
-            branch = subprocess.run(["git", "-C", TARGET_DIR, "branch", "--show-current"],
+            branch = subprocess.run(["git", "-C", target, "branch", "--show-current"],
                                     capture_output=True, text=True, timeout=15).stdout.strip()
         except Exception:
             dirty, branch = "?", "?"
         run = self.run
         busy = "Yes" if run and not run["done"] else "No"
-        return (f"📊 <b>System Status</b>\n🧠 Agent: {esc(st['agent'])}\n🤖 Model: {esc(st['model'] or 'Default')}\n"
+        ws_name = os.path.basename(target) or target
+        return (f"📊 <b>System Status</b>\n📁 Workspace: <b>{esc(ws_name)}</b>\n<code>{esc(target)}</code>\n"
+                f"🧠 Agent: {esc(st['agent'])}\n🤖 Model: {esc(st['model'] or 'Default')}\n"
                 f"🔒 Mode: {esc(st['mode'])}\n📂 Session: {esc((st['session_id'] or 'New')[:18])}\n"
                 f"⏳ Running: {busy}\n🔢 Daily Tasks: {st['count']}/{DAILY_LIMIT}\n"
                 f"🌿 Branch: {esc(branch)} · Modified files: {dirty}")
@@ -1535,6 +1627,10 @@ class Room:
             return self.menu_models()
         if cmd == "/mode":
             return self.menu_mode()
+        if cmd in ("/cd", "/workspace", "/workspaces", "/projects", "/ws"):
+            if rest:
+                return self.switch_workspace(rest)
+            return self.menu_workspaces()
         if cmd == "/sessions":
             return self.menu_sessions()
         if cmd == "/new":
@@ -1560,6 +1656,26 @@ class Room:
             return self.send("أمر غير معروف. جرّب /help")
         if not msg.get("photo") and self.take_typed_answer(text):
             return
+
+        # Smart workspace prefix: e.g. @web or @app or @api
+        if text.startswith("@") and not cmd:
+            first_token = text.split()[0][1:].lower()
+            known = list(getattr(self.cfg, "workspaces", []) or [])
+            matched_ws = None
+            for w in known:
+                base = os.path.basename(w).lower()
+                clean_base = base.replace("-", "").replace("_", "").replace(" ", "")
+                if first_token in (base, clean_base):
+                    matched_ws = w
+                    break
+            if matched_ws:
+                remainder = text[len(text.split()[0]):].strip()
+                if matched_ws != self.target_dir:
+                    self.switch_workspace(matched_ws)
+                if remainder:
+                    text = remainder
+                else:
+                    return
         if legacy.is_sync_request(text) and not msg.get("photo"):
             ok, report = legacy.run_sync()
             self.send_long(report, reply_to=mid)
@@ -1645,6 +1761,21 @@ class Room:
         if kind == "diff":
             self.answer_cb(cb_id)
             return self.diff()
+        if kind == "menu:ws":
+            self.answer_cb(cb_id)
+            return self.menu_workspaces(msg)
+        if kind == "ws":
+            self.answer_cb(cb_id, "تبديل مساحة العمل…")
+            known = list(getattr(self.cfg, "workspaces", []) or [])
+            if self.target_dir not in known:
+                known.append(self.target_dir)
+            try:
+                idx = int(arg)
+                if 0 <= idx < len(known):
+                    return self.switch_workspace(known[idx])
+            except ValueError:
+                pass
+            return
         if kind == "hp":
             self.answer_cb(cb_id)
             return self.send(self.help_text(), self.help_keyboard())
@@ -1910,8 +2041,9 @@ class Room:
     def help_keyboard(self, help_row=False):
         return keyboard([[(self.t("btn_agent"), "menu:ag"), (self.t("btn_model"), "menu:md"), (self.t("btn_mode"), "menu:mo")],
                          [(self.t("btn_sessions"), "menu:se"), (self.t("btn_new"), "new"), (self.t("btn_stop"), "stop")],
-                         [(self.t("btn_status"), "st"), (self.t("btn_usage"), "us"), (self.t("btn_diff"), "diff")],
-                         [(self.t("btn_skills"), "menu:sk"), (self.t("btn_handoff"), "ho"), (self.t("btn_language"), "menu:lg")]], help_row=help_row)
+                         [(self.t("btn_status"), "st"), (self.t("btn_workspaces"), "menu:ws"), (self.t("btn_diff"), "diff")],
+                         [(self.t("btn_skills"), "menu:sk"), (self.t("btn_usage"), "us"), (self.t("btn_language"), "menu:lg")],
+                         [(self.t("btn_handoff"), "ho"), (self.t("btn_help"), "hp")]], help_row=help_row)
 
     def help_text(self):
         cur = self.state.get("skill")
@@ -1957,11 +2089,22 @@ def main():
     allowed_chat = cfg.allowed_chat_id
     target_dir = cfg.target_dir
 
+    global CFG, TARGET_DIR, SYSTEM_HEADER, ALLOWED_CHAT, DAILY_LIMIT, RUN_TIMEOUT, DEFAULT_AGENT, DEFAULT_MODEL, FAVORITE_MODELS
+    CFG = cfg
+    TARGET_DIR = target_dir
+    SYSTEM_HEADER = get_system_header(TARGET_DIR)
+    ALLOWED_CHAT = allowed_chat
+    DAILY_LIMIT = cfg.daily_limit
+    RUN_TIMEOUT = cfg.run_timeout
+    DEFAULT_AGENT = cfg.default_agent
+    DEFAULT_MODEL = cfg.default_model or None
+    FAVORITE_MODELS = cfg.favorite_models
+
     def tg(method, params=None, timeout=30):
         return legacy.api(token, method, params, timeout=timeout)
 
     proc, oc = start_server(target_dir=target_dir)
-    room = Room(tg, oc, allowed_chat, state_path=cfg.room_state_path)
+    room = Room(tg, oc, allowed_chat, state_path=cfg.room_state_path, proc=proc, cfg=cfg)
 
     def tg_file(path):
         url = f"https://api.telegram.org/file/bot{token}/{path}"
@@ -1972,8 +2115,9 @@ def main():
 
     def shutdown(signum, frame):
         stop_flag.set()
+        p = getattr(room, "proc", None) or proc
         try:
-            os.killpg(proc.pid, signal.SIGTERM)
+            os.killpg(p.pid, signal.SIGTERM)
         except Exception:
             pass
         legacy.log("room_stopped", result=f"signal {signum}")
@@ -1985,12 +2129,15 @@ def main():
         backoff = 1
         while not stop_flag.is_set():
             try:
-                for ev in oc.events():
+                current_oc = room.oc
+                for ev in current_oc.events():
                     backoff = 1
                     try:
                         room.on_event(ev)
                     except Exception as e:
                         legacy.log("room_event_error", result=str(e)[:150])
+                    if room.oc is not current_oc:
+                        break
             except Exception as e:
                 legacy.log("room_sse_reconnect", result=str(e)[:100])
             time.sleep(backoff)

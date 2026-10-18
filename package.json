@@ -1,11 +1,12 @@
 {
-  "name": "rumuze-edit",
-  "version": "1.0.7",
-  "description": "Control OpenCode and AI coding agents on your machine directly from Telegram with live streaming cards, interactive buttons, and security sandboxing.",
-  "main": "bin/rumuze-edit.js",
+  "name": "agentgram",
+  "version": "1.0.0",
+  "description": "Turn your Telegram into a live AI Agent Control Room. Monitor coding runs, stream real-time logs, approve/reject file diffs, and control multi-machine ops from your phone.",
+  "main": "bin/agentgram.js",
   "bin": {
-    "rumuze-edit": "bin/rumuze-edit.js",
-    "rumuze": "bin/rumuze-edit.js"
+    "agentgram": "bin/agentgram.js",
+    "ag": "bin/agentgram.js",
+    "rumuze-edit": "bin/agentgram.js"
   },
   "files": [
     "bin/",
@@ -15,34 +16,36 @@
     "LICENSE"
   ],
   "scripts": {
-    "start": "node bin/rumuze-edit.js start",
-    "status": "node bin/rumuze-edit.js status",
-    "init": "node bin/rumuze-edit.js init",
+    "start": "node bin/agentgram.js start",
+    "status": "node bin/agentgram.js status",
+    "init": "node bin/agentgram.js init",
     "test": "python3 -m unittest discover -s tests",
     "prepack": "rm -rf core/__pycache__ tests/__pycache__"
   },
   "keywords": [
-    "opencode",
+    "agentgram",
     "telegram",
     "ai-agent",
+    "opencode",
     "claude-code",
     "coding-agent",
     "developer-tools",
     "remote-control",
     "terminal",
-    "rumuze",
-    "live-coding"
+    "live-coding",
+    "devops",
+    "mission-control"
   ],
   "author": "Rumuze <support@rumuze.com> (https://rumuze.com)",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rumuze/rumuze-edit.git"
+    "url": "git+https://github.com/rumuze/agentgram.git"
   },
   "bugs": {
-    "url": "https://github.com/rumuze/rumuze-edit/issues"
+    "url": "https://github.com/rumuze/agentgram/issues"
   },
-  "homepage": "https://github.com/rumuze/rumuze-edit#readme",
+  "homepage": "https://github.com/rumuze/agentgram#readme",
   "engines": {
     "node": ">=18.0.0"
   },

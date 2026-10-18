@@ -26,6 +26,19 @@ class TestConfig(unittest.TestCase):
         errors = cfg.validate()
         self.assertGreaterEqual(len(errors), 2)
 
+    def test_workspaces_management(self):
+        cfg = Config(target_dir=tempfile.gettempdir())
+        self.assertIsInstance(cfg.workspaces, list)
+        tmp = tempfile.mkdtemp()
+        try:
+            cfg.add_workspace(tmp)
+            self.assertIn(os.path.realpath(tmp), cfg.workspaces)
+        finally:
+            try:
+                os.rmdir(tmp)
+            except Exception:
+                pass
+
 
 if __name__ == "__main__":
     unittest.main()

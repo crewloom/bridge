@@ -13,7 +13,15 @@ import json
 import os
 import sys
 
-GLOBAL_CONFIG_DIR = os.path.expanduser("~/.config/rumuze-edit")
+LEGACY_CONFIG_DIR = os.path.expanduser("~/.config/rumuze-edit")
+AGENTGRAM_CONFIG_DIR = os.path.expanduser("~/.config/agentgram")
+
+# Prefer ~/.config/agentgram; fallback to legacy ~/.config/rumuze-edit if it already exists
+if os.path.isdir(AGENTGRAM_CONFIG_DIR) or not os.path.isdir(LEGACY_CONFIG_DIR):
+    GLOBAL_CONFIG_DIR = AGENTGRAM_CONFIG_DIR
+else:
+    GLOBAL_CONFIG_DIR = LEGACY_CONFIG_DIR
+
 GLOBAL_CONFIG_FILE = os.path.join(GLOBAL_CONFIG_DIR, "config.json")
 GLOBAL_STATE_DIR = os.path.join(GLOBAL_CONFIG_DIR, "state")
 
@@ -44,7 +52,8 @@ class Config:
 
         # Storage paths
         self.global_config_path = config_path or GLOBAL_CONFIG_FILE
-        self.project_config_path = os.path.join(self.target_dir, ".rumuze-edit.json")
+        self.project_config_path = os.path.join(self.target_dir, ".agentgram.json")
+        self.legacy_project_config_path = os.path.join(self.target_dir, ".rumuze-edit.json")
         self.state_dir = GLOBAL_STATE_DIR
 
         # State files scoped by workspace
@@ -69,13 +78,14 @@ class Config:
         self.run_timeout = 30 * 60
         self.language = "en"
         self.deny_patterns = []
+        self.workspaces = []
         self.extra = {}
 
         self.load()
 
     def load(self):
         """Loads configuration in order: Global -> Project -> Env -> CLI."""
-        # 1. Global config (~/.config/rumuze-edit/config.json)
+        # 1. Global config (~/.config/agentgram/config.json or legacy ~/.config/rumuze-edit/config.json)
         if os.path.isfile(self.global_config_path):
             try:
                 with open(self.global_config_path, "r", encoding="utf-8") as f:
@@ -93,26 +103,32 @@ class Config:
             except Exception:
                 pass
 
-        # 2. Project config (.rumuze-edit.json)
-        if os.path.isfile(self.project_config_path):
+        # 2. Project config (.agentgram.json or legacy .rumuze-edit.json)
+        cfg_file = self.project_config_path if os.path.isfile(self.project_config_path) else self.legacy_project_config_path
+        if os.path.isfile(cfg_file):
             try:
-                with open(self.project_config_path, "r", encoding="utf-8") as f:
+                with open(cfg_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                     self._merge_dict(data)
             except Exception:
                 pass
 
         # 3. Environment variables
-        env_token = os.environ.get("RUMUZE_EDIT_BOT_TOKEN") or os.environ.get("TGBRIDGE_TOKEN")
+        env_token = (os.environ.get("AGENTGRAM_BOT_TOKEN") or
+                     os.environ.get("RUMUZE_EDIT_BOT_TOKEN") or
+                     os.environ.get("TGBRIDGE_TOKEN"))
         if env_token:
             self.bot_token = env_token.strip()
 
-        env_chat = (os.environ.get("RUMUZE_EDIT_ALLOWED_CHAT_ID") or
+        env_chat = (os.environ.get("AGENTGRAM_ALLOWED_CHAT_ID") or
+                    os.environ.get("RUMUZE_EDIT_ALLOWED_CHAT_ID") or
                     os.environ.get("TGBRIDGE_ALLOWED_CHAT_ID"))
         if env_chat:
             self.allowed_chat_id = env_chat.strip()
 
-        env_agent = os.environ.get("RUMUZE_EDIT_AGENT") or os.environ.get("TGBRIDGE_AGENT")
+        env_agent = (os.environ.get("AGENTGRAM_AGENT") or
+                     os.environ.get("RUMUZE_EDIT_AGENT") or
+                     os.environ.get("TGBRIDGE_AGENT"))
         if env_agent:
             self.default_agent = env_agent.strip()
 
@@ -153,8 +169,26 @@ class Config:
             self.language = str(data["language"]).strip().lower()
         if "deny_patterns" in data and isinstance(data["deny_patterns"], list):
             self.deny_patterns = [str(p) for p in data["deny_patterns"]]
+        if "workspaces" in data and isinstance(data["workspaces"], list):
+            self.workspaces = [str(w).strip() for w in data["workspaces"] if str(w).strip()]
         if "extra" in data and isinstance(data["extra"], dict):
             self.extra.update(data["extra"])
+
+    def add_workspace(self, path):
+        """Register a workspace directory path safely and persist to global config."""
+        real = os.path.realpath(os.path.abspath(path))
+        if os.path.isdir(real):
+            if real not in self.workspaces:
+                self.workspaces.append(real)
+            try:
+                if os.path.isfile(self.global_config_path):
+                    with open(self.global_config_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    data["workspaces"] = self.workspaces
+                    with open(self.global_config_path, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
 
     def save_global(self):
         """Save current configuration to global user config file."""
@@ -169,6 +203,7 @@ class Config:
             "daily_limit": self.daily_limit,
             "run_timeout": self.run_timeout,
             "deny_patterns": self.deny_patterns,
+            "workspaces": self.workspaces,
             "extra": self.extra,
         }
         with open(self.global_config_path, "w", encoding="utf-8") as f:
@@ -182,9 +217,9 @@ class Config:
         """Check essential configuration and return list of errors if any."""
         errors = []
         if not self.bot_token:
-            errors.append("Telegram Bot Token is missing. Run `rumuze-edit init` or set RUMUZE_EDIT_BOT_TOKEN.")
+            errors.append("Telegram Bot Token is missing. Run `agentgram init` or set AGENTGRAM_BOT_TOKEN.")
         if not self.allowed_chat_id:
-            errors.append("Allowed Chat ID is missing. Run `rumuze-edit init` to pair your Telegram chat.")
+            errors.append("Allowed Chat ID is missing. Run `agentgram init` to pair your Telegram chat.")
         if not os.path.isdir(self.target_dir):
             errors.append(f"Target directory does not exist: {self.target_dir}")
         return errors
