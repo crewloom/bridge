@@ -18,4 +18,10 @@ if (!fs.existsSync(dist)) {
   }
 }
 
-require(dist);
+const mod = require(dist);
+if (mod && typeof mod.runCli === 'function') {
+  mod.runCli().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
