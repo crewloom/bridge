@@ -3,12 +3,23 @@
 > **Remote AI Coding Agent Bridge & Live Telegram Control Room**  
 > Control [OpenCode](https://opencode.ai), AI coding agents, and terminal tools on your local machine or VPS directly from your phone via Telegram.
 
-[![CI](https://github.com/rumuze/rumuze-edit/actions/workflows/ci.yml/badge.svg)](https://github.com/rumuze/rumuze-edit/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/rumuze-edit.svg?style=flat-square)](https://www.npmjs.com/package/rumuze-edit)
+[![npm version](https://img.shields.io/npm/v/rumuze-edit.svg?style=flat-square&logo=npm&color=CB3837)](https://www.npmjs.com/package/rumuze-edit)
+[![npm package size](https://img.shields.io/badge/package%20size-44.7%20kB-22c55e?style=flat-square&logo=npm)](https://www.npmjs.com/package/rumuze-edit)
+[![dependencies](https://img.shields.io/badge/dependencies-0%20(zero)-success.svg?style=flat-square)](https://www.npmjs.com/package/rumuze-edit)
+[![CI Matrix](https://img.shields.io/github/actions/workflow/status/rumuze/rumuze-edit/ci.yml?branch=main&label=CI%20matrix&style=flat-square&logo=githubactions&logoColor=white)](https://github.com/rumuze/rumuze-edit/actions)
+[![Packagist](https://img.shields.io/badge/Packagist-rumuze%2Fedit-f28d1a.svg?style=flat-square&logo=packagist&logoColor=white)](https://packagist.org/packages/rumuze/edit)
+[![GitHub release](https://img.shields.io/github/v/release/rumuze/rumuze-edit?style=flat-square&color=3b82f6&logo=github)](https://github.com/rumuze/rumuze-edit/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Python](https://img.shields.io/badge/Python-3.9+-yellow.svg?style=flat-square)](https://python.org)
-[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg?style=flat-square)](https://nodejs.org)
-[![Composer / Packagist](https://img.shields.io/badge/Packagist-rumuze%2Fedit-orange.svg?style=flat-square)](https://packagist.org/packages/rumuze/edit)
+[![Python](https://img.shields.io/badge/Python-3.9%20..%203.14-yellow.svg?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![Node.js](https://img.shields.io/badge/Node.js-18%20..%2022-green.svg?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
+
+<p align="center">
+  <a href="https://www.npmjs.com/package/rumuze-edit"><b>📦 View on NPM</b></a> •
+  <a href="https://packagist.org/packages/rumuze/edit"><b>🐘 View on Packagist</b></a> •
+  <a href="https://github.com/rumuze/rumuze-edit/releases/latest"><b>🏷️ Release Notes (v1.0.2)</b></a> •
+  <a href="#-quick-start"><b>🚀 Quick Start</b></a> •
+  <a href="#-frequently-asked-questions-faq"><b>❓ FAQ</b></a>
+</p>
 
 ---
 
@@ -59,22 +70,28 @@ flowchart LR
 
 ## 🚀 Quick Start
 
-### 1. Via NPM (Recommended for all developers)
+### 1. Via NPM (Global Installation)
 
-Run the interactive setup wizard in any project directory:
+Install globally across your machine:
 
 ```bash
-npx rumuze-edit init
+npm install -g rumuze-edit
+
+# Initialize in any repo
+rumuze-edit init
+
+# Start control room
+rumuze-edit start
 ```
 
-The wizard will:
-1. Verify Python 3 and OpenCode installation.
-2. Prompt for your Telegram Bot Token (from [@BotFather](https://t.me/botfather)).
-3. **Auto-Pair:** Prompt you to open your bot and click **Start**. It pairs your Telegram account instantly!
+### 2. Via NPX (Zero-Install Instant Runner)
 
-To launch the control room:
+Run immediately in any project without installing globally:
 
 ```bash
+# Launch interactive pairing wizard
+npx rumuze-edit init
+
 # Run in foreground
 npx rumuze-edit start
 

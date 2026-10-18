@@ -37,7 +37,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rumuze/rumuze-edit.git"
+    "url": "git+https://github.com/rumuze/rumuze-edit.git"
   },
   "bugs": {
     "url": "https://github.com/rumuze/rumuze-edit/issues"
