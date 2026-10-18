@@ -7,9 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+---
+
+## [1.0.7] - 2026-10-18
+
 ### Added
-- Multi-arch `Dockerfile` and `docker-compose.yml` for containerized headless deployments on Linux VPS and servers.
-- Automated Dependabot configuration for GitHub Actions and npm package ecosystem.
+- **Expanded Operations & Multi-Machine Permissions**: Fully authorized SSH jump-host connections, ops deployment scripts (`pinpoint-go`, `release-and-push.sh`), server log inspections, and multi-machine coordination.
+- **Allowed Scopes & Path Boundaries**: Added `allowed_paths` support in `SecurityPolicy` and `is_path_safe` to cleanly support external key paths, certificates, and multi-directory setups without false path-escape alerts.
+- **Empowered System Prompt**: Removed artificial LLM refusal prompts regarding SSH and ops; updated system prompt to explicitly empower server ops when requested or approved by the owner.
+
+### Changed
+- **Streamlined Security Policy**: Refined `DEFAULT_DENY_PATTERNS` to target irreversible destructive operations (`rm -rf /`, `mkfs`, `dd if=`, `shutdown`, `chmod -R 777`) while allowing daily developer operations like SSH keys, config inspections, and ops commands.
 
 ---
 
