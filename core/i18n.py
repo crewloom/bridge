@@ -77,6 +77,10 @@ MESSAGES = {
         "daily_limit_reached": "Daily task limit ({limit}) reached.",
         "task_queued": "➕ Queued (will run after current step finishes).",
         "stopped_by_user": "Stopped by user request",
+
+        # Security & Prompt Injection Shield
+        "prompt_injection_blocked": "🛡️ <b>Security Shield Blocked Prompt Injection</b>\n{reason}\n<i>Your request was safely rejected to preserve system boundaries.</i>",
+        "policy_denied": "⛔ <b>Blocked by Security Policy</b>\nDeny rule matched: <code>{hits}</code>",
     },
     "ar": {
         # Buttons
@@ -148,6 +152,10 @@ MESSAGES = {
         "daily_limit_reached": "تم الوصول لحد المهام اليومي ({limit}).",
         "task_queued": "➕ أُضيفت للطابور (تُنفّذ بعد انتهاء الخطوة الحالية).",
         "stopped_by_user": "أُوقفت بطلب من المستخدم",
+
+        # Security & Prompt Injection Shield
+        "prompt_injection_blocked": "🛡️ <b>درع الحماية: تم حظر محاولة حقن البرومبت</b>\n{reason}\n<i>تم رفض الطلب لحماية حدود النظام وقواعد الأمان.</i>",
+        "policy_denied": "⛔ <b>مرفوض بسياسة الأمان</b>\nتطابق مع قاعدة الحظر: <code>{hits}</code>",
     }
 }
 

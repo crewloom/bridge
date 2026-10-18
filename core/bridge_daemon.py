@@ -178,6 +178,12 @@ def policy_deny(text, cfg=None):
     return policy.check_command(text)
 
 
+def policy_check_prompt(text, cfg=None):
+    c = cfg or CURRENT_CFG or get_config()
+    policy = SecurityPolicy(c.target_dir, custom_patterns=c.deny_patterns)
+    return policy.check_prompt(text)
+
+
 def is_sync_request(text):
     t = text or ""
     if re.search(r"\bgit\s+", t, re.IGNORECASE):

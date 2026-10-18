@@ -189,18 +189,26 @@ npx rumuze-edit service install
 
 ---
 
-## 🔒 Security Sandboxing
+## 🔒 Security Sandboxing & Prompt Injection Shield
 
-Rumuze Edit is engineered with a strict security model:
-1. **Single Chat ID Lock:** Every message and inline callback query validates `chat.id == ALLOWED_CHAT_ID`. Unknown users are ignored.
-2. **Loopback Server:** OpenCode server runs strictly on `127.0.0.1` with a per-session randomized high-entropy password.
-3. **Execution Blocklist:** Denies destructive patterns by default:
-   - `rm -rf /` or `rm -rf ~`
-   - `sudo` elevation
-   - Reading `id_rsa`, `id_ed25519`, `.pem`, `.ppk`
-   - Leaking `.env` or production credentials
-   - Path traversal (`../`) outside the configured workspace directory.
-4. **Token Isolation:** Bot token is saved with `0600` file permissions in `~/.config/rumuze-edit/config.json`.
+Rumuze Edit is engineered with an enterprise-grade multi-layer security architecture:
+
+1. **🛡️ Advanced Prompt Injection Shield:**
+   - **Role Hijacking & Jailbreak Defense:** Actively detects and blocks imperative prompt overrides ("ignore previous instructions", "disregard prior directives", "DAN mode", "system override:", and Arabic variants "تجاهل التعليمات السابقة", "أنت الآن في وضع المطور").
+   - **System Boundary Isolation:** Prevents delimiter evasion and token spoofing (`</untrusted-report>`, `<system>`, `<|im_start|>`, `[INST] <<SYS>>`, ````system`).
+   - **Unicode & Obfuscation Neutralization:** Automatically normalizes Unicode (NFKC) and strips zero-width/invisible evasion characters (`\u200B`, `\u200C`, `\uFEFF`, `\u2060`) and BiDi overrides (`\u202E`). Recursively unpacks and inspects base64 payloads.
+   - **Data Exfiltration Defense:** Blocks markdown image (`![exfil](https://.../?token=)`) and HTML link exfiltration vectors.
+   - **Zero False Positives:** Built with contextual intent filters that distinguish malicious imperative overrides from legitimate developer tasks (e.g. `git commit -m "ignore previous errors"`, regex development, or security discussions).
+2. **🔐 Cryptographic Quarantine Envelopes:**
+   - External error logs, Pinpoint Ops traces, and untrusted inputs are wrapped inside isolated blocks (`<untrusted-report id="...">`) signed with cryptographically random nonces (`secrets.token_hex(8)`). All embedded tags are neutralized before injection.
+3. **🚫 Execution Blocklist:**
+   - Destructive commands (`rm -rf /`, `rm -rf ~`, `mkfs`, `dd`)
+   - Privilege escalation (`sudo`)
+   - Private SSH keys (`id_rsa`, `id_ed25519`, `.pem`, `.ppk`)
+   - Production secrets (`.env`, `.env.production`)
+   - Directory traversal (`../`) outside the target project boundary.
+4. **👤 Single Chat ID Lock:** Every message and inline callback query validates `chat.id == ALLOWED_CHAT_ID`. Unknown users are ignored.
+5. **🔒 Loopback & Token Isolation:** OpenCode server runs strictly on `127.0.0.1` with a per-session randomized high-entropy password; bot token is saved with strict `0600` file permissions.
 
 ---
 
