@@ -86,4 +86,12 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
     this.client.on('event', this.boundEventHandler);
     this.client.connectEventStream();
   }
+
+  public async listModels(): Promise<Array<{ id: string; name?: string }>> {
+    return this.client.listModels();
+  }
+
+  public async listAgents(): Promise<Array<{ name: string; description?: string }>> {
+    return this.client.listAgents();
+  }
 }

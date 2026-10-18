@@ -28,10 +28,10 @@ export interface OpenCodeEvent {
 
 export class OpenCodeClient extends EventEmitter {
   public readonly baseUrl: string;
-  private readonly password?: string;
+  private readonly password?: string | undefined;
   public readonly directory: string;
-  private serverProcess?: child_process.ChildProcess;
-  private sseReq?: http.ClientRequest;
+  private serverProcess?: child_process.ChildProcess | undefined;
+  private sseReq?: http.ClientRequest | undefined;
   private isConnected = false;
 
   constructor(baseUrl: string, password?: string, directory?: string) {
@@ -234,8 +234,8 @@ export class OpenCodeClient extends EventEmitter {
     return this.request<Array<{ id: string; title?: string }>>('GET', '/session');
   }
 
-  public async createSession(title?: string): Promise<{ id: string }> {
-    return this.request<{ id: string }>('POST', '/session', { title });
+  public async createSession(title?: string): Promise<{ id: string; title?: string }> {
+    return this.request<{ id: string; title?: string }>('POST', '/session', { title });
   }
 
   /**

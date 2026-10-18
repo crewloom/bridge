@@ -25,8 +25,8 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
   public workspaceDir: string;
   private readonly cliCommand: string;
   private readonly defaultArgs: string[];
-  private activeProcess?: child_process.ChildProcess;
-  private activeSessionId?: string;
+  private activeProcess?: child_process.ChildProcess | undefined;
+  public activeSessionId?: string | undefined;
 
   constructor(options: ShellEngineOptions = {}) {
     super();

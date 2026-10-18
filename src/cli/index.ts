@@ -5,11 +5,10 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import * as https from 'node:https';
 import * as readline from 'node:readline';
 import * as child_process from 'node:child_process';
 import { ConfigManager, AGENTGRAM_CONFIG_DIR, LEGACY_CONFIG_DIR } from '../config/config-manager.js';
-import { TelegramClient } from '../telegram/telegram-client.js';
+import { TelegramClient, escapeHtml } from '../telegram/telegram-client.js';
 import { OpenCodeClient } from '../opencode/opencode-client.js';
 import { ControlRoom } from '../control-room/control-room.js';
 import { TelegramChannelAdapter } from '../channels/telegram.adapter.js';
@@ -22,7 +21,7 @@ import { EngineRegistry } from '../engines/registry.js';
 import type { IAgentEngine } from '../engines/engine.interface.js';
 import { ServiceManager, getEntryPoint } from '../service/service-manager.js';
 
-export const VERSION = '2.0.1';
+export const VERSION = '2.0.2';
 
 // ANSI Styling Tokens
 export const C = {
@@ -295,13 +294,13 @@ export async function cmdStart(args: string[]): Promise<void> {
   // Pluggable Channel Resolution
   const chanIdx = args.indexOf('--channel');
   const selectedChannel = (chanIdx !== -1 && args[chanIdx + 1]
-    ? args[chanIdx + 1]
+    ? args[chanIdx + 1]!
     : cfgManager.config.channel || 'telegram').toLowerCase();
 
   // Pluggable Agent Engine Resolution
   const engIdx = args.indexOf('--engine');
   const selectedEngine = (engIdx !== -1 && args[engIdx + 1]
-    ? args[engIdx + 1]
+    ? args[engIdx + 1]!
     : cfgManager.config.engine || 'opencode').toLowerCase();
 
   cfgManager.config.channel = selectedChannel;

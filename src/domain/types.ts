@@ -54,14 +54,14 @@ export interface ServiceStatus {
   installed: boolean;
   running: boolean;
   system: string;
-  path?: string;
+  path?: string | undefined;
 }
 
 // Telegram Bot API Models
 export interface InlineKeyboardButton {
   text: string;
-  callback_data?: string;
-  url?: string;
+  callback_data?: string | undefined;
+  url?: string | undefined;
 }
 
 export interface InlineKeyboardMarkup {
@@ -132,7 +132,7 @@ export interface OpenCodeRun {
   model: string;
   mode: ExecutionMode;
   startedAt: number;
-  userMsgId?: number;
+  userMsgId?: number | undefined;
   userMessages: Set<string>;
   text: Record<string, string>;
   textOrder: string[];
@@ -143,7 +143,7 @@ export interface OpenCodeRun {
   cmds: number;
   busy: boolean;
   done: boolean;
-  error?: string | null;
+  error?: string | null | undefined;
 }
 
 export interface OpenCodePermissionRequest {

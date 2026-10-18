@@ -3,7 +3,7 @@
  * Production-ready default communication channel wrapping Telegram Bot API.
  * Pure Node.js with zero runtime dependencies.
  */
-import { TelegramClient, escapeHtml } from '../telegram/telegram-client.js';
+import { TelegramClient } from '../telegram/telegram-client.js';
 import type {
   IChannelAdapter,
   ChannelSendOptions,
@@ -23,8 +23,8 @@ export function toTelegramMarkup(keyboard?: ChannelKeyboard): InlineKeyboardMark
     inline_keyboard: keyboard.rows.map((row) =>
       row.map((btn) => ({
         text: btn.text,
-        callback_data: btn.callbackData,
-        url: btn.url,
+        callback_data: btn.callbackData ?? undefined,
+        url: btn.url ?? undefined,
       }))
     ),
   };
@@ -38,8 +38,8 @@ export function fromTelegramMarkup(markup?: InlineKeyboardMarkup): ChannelKeyboa
     rows: markup.inline_keyboard.map((row) =>
       row.map((btn) => ({
         text: btn.text,
-        callbackData: btn.callback_data,
-        url: btn.url,
+        callbackData: btn.callback_data ?? undefined,
+        url: btn.url ?? undefined,
       }))
     ),
   };

@@ -6,8 +6,8 @@
 
 export interface ChannelButton {
   text: string;
-  callbackData?: string;
-  url?: string;
+  callbackData?: string | undefined;
+  url?: string | undefined;
 }
 
 export interface ChannelKeyboard {
@@ -15,10 +15,10 @@ export interface ChannelKeyboard {
 }
 
 export interface ChannelSendOptions {
-  replyMarkup?: ChannelKeyboard;
-  replyToMessageId?: string | number;
-  parseMode?: 'HTML' | 'Markdown' | 'None';
-  disableWebPagePreview?: boolean;
+  replyMarkup?: ChannelKeyboard | undefined;
+  replyToMessageId?: string | number | undefined;
+  parseMode?: 'HTML' | 'Markdown' | 'None' | undefined;
+  disableWebPagePreview?: boolean | undefined;
 }
 
 export interface ChannelMessageResult {
@@ -33,7 +33,7 @@ export interface IncomingChannelMessage {
   chatId: string;
   text: string;
   timestamp: number;
-  replyToMessageId?: string | number;
+  replyToMessageId?: string | number | undefined;
   raw?: unknown;
 }
 
@@ -42,7 +42,7 @@ export interface IncomingChannelAction {
   senderId: string;
   chatId: string;
   actionData: string;
-  messageId?: string | number;
+  messageId?: string | number | undefined;
   raw?: unknown;
 }
 

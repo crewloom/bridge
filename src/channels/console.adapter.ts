@@ -17,7 +17,7 @@ import type {
 export class ConsoleChannelAdapter implements IChannelAdapter {
   public readonly id = 'console';
   public readonly name = 'Terminal Console';
-  private rl?: readline.Interface;
+  private rl?: readline.Interface | undefined;
   private isListening = false;
   private messageCounter = 1;
   private activeKeyboard: Map<number, string> = new Map();
@@ -109,7 +109,7 @@ export class ConsoleChannelAdapter implements IChannelAdapter {
   }
 
   public async editMessage(
-    recipientId: string,
+    _recipientId: string,
     messageId: string | number,
     text: string,
     options?: ChannelSendOptions

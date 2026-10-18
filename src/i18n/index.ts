@@ -20,6 +20,10 @@ export const TRANSLATIONS = {
     btn_handoff: '🔁 Handoff',
     btn_help: '❓ Help',
     btn_language: '🌐 Language',
+    btn_back: '⬅️ Back',
+    btn_all_models: '➡️ All Models',
+    btn_favorites: '⭐ Favorites',
+    btn_next: '➡️ Next',
 
     // Permission Buttons
     perm_allow_once: '✅ Allow Once',
@@ -68,6 +72,10 @@ export const TRANSLATIONS = {
     btn_handoff: '🔁 تسليم',
     btn_help: '❓ مساعدة',
     btn_language: '🌐 اللغة',
+    btn_back: '⬅️ رجوع',
+    btn_all_models: '➡️ جميع النماذج',
+    btn_favorites: '⭐ المفضلة',
+    btn_next: '➡️ التالي',
 
     // Permission Buttons
     perm_allow_once: '✅ مرة واحدة',

@@ -8,7 +8,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as child_process from 'node:child_process';
 import { TelegramClient, escapeHtml, stripHtml } from '../telegram/telegram-client.js';
-import { OpenCodeClient, type OpenCodeEvent } from '../opencode/opencode-client.js';
+import { OpenCodeClient } from '../opencode/opencode-client.js';
 import { TelegramChannelAdapter } from '../channels/telegram.adapter.js';
 import { OpenCodeAdapter } from '../engines/opencode.adapter.js';
 import type {
@@ -136,8 +136,8 @@ export class ControlRoom {
   private alwaysAllowedPerms: Set<string> = new Set();
   private missionCardMsgId: string | number | null = null;
   private updateTimer: NodeJS.Timeout | null = null;
-  private isListening = false;
   private activeSkill: string | null = null;
+  public isListening = false;
 
   // Polymorphic Constructor: supports either options object or legacy 3-arguments
   constructor(options: ControlRoomOptions);
@@ -472,7 +472,26 @@ export class ControlRoom {
 
     // 2. Menu: Models
     if (data === 'menu:md') {
-      await this.sendModelsMenu();
+      await this.sendModelsMenu(0);
+      return;
+    }
+    if (data.startsWith('pg:')) {
+      const page = parseInt(data.slice(3), 10) || 0;
+      await this.sendModelsMenu(page);
+      return;
+    }
+    if (data.startsWith('md:raw:')) {
+      const model = data.slice(7);
+      if (model) {
+        this.currentModel = model;
+        this.cfgManager.config.defaultModel = model;
+        this.cfgManager.saveGlobal();
+        await this.channel.sendMessage(
+          this.allowedChatId,
+          `🤖 Model changed to: <b>${escapeHtml(model)}</b>`,
+          { replyMarkup: this.getMainKeyboard() }
+        );
+      }
       return;
     }
     if (data.startsWith('md:')) {
@@ -796,7 +815,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       }
     }
     if (currentRow.length > 0) rows.push(currentRow);
-    rows.push([{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: t('btn_back', this.language), callback_data: 'hp' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,
@@ -805,19 +824,48 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     );
   }
 
-  private async sendModelsMenu(): Promise<void> {
-    const models = this.cfgManager.config.favoriteModels;
-    const rows: InlineKeyboardButton[][] = models.map((m, idx) => [
+  private async sendModelsMenu(page = 0): Promise<void> {
+    const favs = this.cfgManager.config.favoriteModels || [];
+    let allModels: string[] = [];
+    if (typeof this.engine.listModels === 'function') {
+      try {
+        const raw = await this.engine.listModels();
+        allModels = (raw || []).map((m: { id: string }) => m.id);
+      } catch {}
+    }
+
+    const rest = allModels.filter((m) => !favs.includes(m));
+    const pool = page === 0 ? favs : rest.slice((page - 1) * 10, page * 10);
+
+    const rows: InlineKeyboardButton[][] = pool.map((m, idx) => [
       {
         text: `${m === this.currentModel ? '● ' : ''}${m}`,
-        callback_data: `md:${idx}`,
+        callback_data: page === 0 ? `md:${idx}` : `md:raw:${m}`,
       },
     ]);
-    rows.push([{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }]);
+
+    const navRow: InlineKeyboardButton[] = [];
+    if (page === 0) {
+      navRow.push({ text: t('btn_back', this.language), callback_data: 'hp' });
+      if (rest.length > 0) {
+        navRow.push({ text: t('btn_all_models', this.language), callback_data: 'pg:1' });
+      }
+    } else {
+      navRow.push({ text: t('btn_favorites', this.language), callback_data: 'pg:0' });
+      if (rest.length > page * 10) {
+        navRow.push({ text: t('btn_next', this.language), callback_data: `pg:${page + 1}` });
+      }
+      navRow.push({ text: t('btn_back', this.language), callback_data: 'hp' });
+    }
+
+    if (navRow.length > 0) {
+      rows.push(navRow);
+    }
 
     await this.channel.sendMessage(
       this.allowedChatId,
-      t('select_model', this.language, { model: escapeHtml(this.currentModel || 'Default') }),
+      t('select_model', this.language, { model: escapeHtml(this.currentModel || 'Default') }) +
+        (page > 0 ? ` — Page ${page}` : ''),
       { replyMarkup: this.wrapKeyboard(rows) }
     );
   }
@@ -830,7 +878,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
         { text: `${this.currentMode === 'auto' ? '● ' : ''}⚡ Auto Mode`, callback_data: 'mo:auto' },
       ],
       [
-        { text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' },
+        { text: t('btn_back', this.language), callback_data: 'hp' },
       ],
     ];
 
@@ -851,7 +899,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
         callback_data: `se:${this.activeRun.sessionId}`,
       }]);
     }
-    rows.push([{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: t('btn_back', this.language), callback_data: 'hp' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,
@@ -915,7 +963,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     const rows: InlineKeyboardButton[][] = skillsList.map((sk) => [
       { text: `🧰 ${sk}`, callback_data: `sk:${sk}` },
     ]);
-    rows.push([{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: t('btn_back', this.language), callback_data: 'hp' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,
@@ -944,7 +992,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     const rows: InlineKeyboardButton[][] = [
       [{ text: `${cur === 'en' ? '● ' : ''}🇺🇸 English`, callback_data: 'lang:en' }],
       [{ text: `${cur === 'ar' ? '● ' : ''}🇸🇦 العربية`, callback_data: 'lang:ar' }],
-      [{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }],
+      [{ text: t('btn_back', this.language), callback_data: 'hp' }],
     ];
 
     await this.channel.sendMessage(
@@ -995,7 +1043,7 @@ Agent: <b>${escapeHtml(this.currentAgent)}</b> | Mode: <b>${escapeHtml(this.curr
         callback_data: `ws:${i}`,
       },
     ]);
-    rows.push([{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: t('btn_back', this.language), callback_data: 'hp' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,

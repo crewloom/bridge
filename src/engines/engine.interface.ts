@@ -8,14 +8,14 @@ import type { EventEmitter } from 'node:events';
 export interface AgentSession {
   id: string;
   workspaceDir: string;
-  title?: string;
+  title?: string | undefined;
 }
 
 export interface AgentSessionOptions {
-  workspaceDir?: string;
-  title?: string;
-  agent?: string;
-  model?: string;
+  workspaceDir?: string | undefined;
+  title?: string | undefined;
+  agent?: string | undefined;
+  model?: string | undefined;
 }
 
 export interface AgentEngineToolCall {
@@ -85,4 +85,14 @@ export interface IAgentEngine extends EventEmitter {
    * Switch the active working directory / workspace.
    */
   setWorkspace(directory: string): Promise<void> | void;
+
+  /**
+   * List available models from the engine.
+   */
+  listModels?(): Promise<Array<{ id: string; name?: string }>>;
+
+  /**
+   * List available agents from the engine.
+   */
+  listAgents?(): Promise<Array<{ name: string; description?: string }>>;
 }

@@ -112,6 +112,12 @@ export class ServiceManager {
           fs.mkdirSync(LINUX_SERVICE_DIR, { recursive: true });
         }
 
+        let pathEnv = process.env.PATH || '/usr/local/bin:/usr/bin:/bin';
+        const opencodeBin = path.join(os.homedir(), '.opencode', 'bin');
+        if (!pathEnv.includes(opencodeBin)) {
+          pathEnv = `${opencodeBin}:${pathEnv}`;
+        }
+
         const unitContent = `[Unit]
 Description=AgentGram AI Telegram Mission Control
 After=network.target
@@ -119,6 +125,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=${resolvedTarget}
+Environment="PATH=${pathEnv}"
 ExecStart=${nodeExec} ${script} start --dir ${resolvedTarget}
 Restart=always
 RestartSec=5
@@ -162,10 +169,11 @@ WantedBy=default.target
       }
       return { success: true, message: 'Uninstalled macOS launchd service.' };
     } else if (platform === 'linux') {
-      for (const [name, p] of [
+      const services: Array<[string, string]> = [
         [LINUX_SERVICE_NAME, LINUX_SERVICE_PATH],
         [LEGACY_LINUX_SERVICE_NAME, LEGACY_LINUX_SERVICE_PATH],
-      ]) {
+      ];
+      for (const [name, p] of services) {
         if (fs.existsSync(p)) {
           spawnSync('systemctl', ['--user', 'stop', name]);
           spawnSync('systemctl', ['--user', 'disable', name]);

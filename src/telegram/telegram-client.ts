@@ -10,9 +10,9 @@ import type {
 } from '../domain/types.js';
 
 export interface SendMessageOptions {
-  replyMarkup?: InlineKeyboardMarkup;
-  replyToMessageId?: number;
-  disableWebPagePreview?: boolean;
+  replyMarkup?: InlineKeyboardMarkup | undefined;
+  replyToMessageId?: number | undefined;
+  disableWebPagePreview?: boolean | undefined;
 }
 
 export function escapeHtml(text: string): string {

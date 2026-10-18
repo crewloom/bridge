@@ -24,12 +24,11 @@ export function getGlobalConfigDir(): string {
 }
 
 export function ensureConfigDirs(): void {
-  const dir = getGlobalConfigDir();
-  const stateDir = path.join(dir, 'state');
   try {
     if (!fs.existsSync(AGENTGRAM_CONFIG_DIR)) fs.mkdirSync(AGENTGRAM_CONFIG_DIR, { recursive: true, mode: 0o700 });
-    if (!fs.existsSync(path.join(AGENTGRAM_CONFIG_DIR, 'state'))) {
-      fs.mkdirSync(path.join(AGENTGRAM_CONFIG_DIR, 'state'), { recursive: true, mode: 0o700 });
+    const stateDir = path.join(AGENTGRAM_CONFIG_DIR, 'state');
+    if (!fs.existsSync(stateDir)) {
+      fs.mkdirSync(stateDir, { recursive: true, mode: 0o700 });
     }
 
     // Auto-migrate legacy configuration if found
