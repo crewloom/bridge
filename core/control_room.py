@@ -740,6 +740,20 @@ class Room:
         try:
             r = self.tg("sendMessage", params)
         except urllib.error.HTTPError as e:
+            if e.code == 400:
+                body = ""
+                try:
+                    body = e.read().decode("utf-8", "replace")
+                except Exception:
+                    pass
+                if "can't parse entities" in body.lower() or "entity" in body.lower():
+                    params.pop("parse_mode", None)
+                    params["text"] = plain(text)[:4000]
+                    try:
+                        r = self.tg("sendMessage", params)
+                        return (r.get("result") or {}).get("message_id")
+                    except Exception:
+                        pass
             if e.code != 429:
                 raise
             self.backoff_until = self.clock() + self._retry_after(e)
@@ -765,6 +779,14 @@ class Room:
                 pass
             if e.code == 400 and "not modified" in body.lower():
                 return True
+            if e.code == 400 and ("can't parse entities" in body.lower() or "entity" in body.lower()):
+                params.pop("parse_mode", None)
+                params["text"] = plain(text)[:4000]
+                try:
+                    self.tg("editMessageText", params)
+                    return True
+                except Exception:
+                    pass
             legacy.log("room_edit_error", result=f"{e.code} {clip(body, 120)}")
             return False
         return True
@@ -848,7 +870,7 @@ class Room:
         if nav:
             rows.append(nav)
         if not models:
-            return "🤖 Could not load models list right now. Try again shortly or use <code>/m provider/model <task></code>.", None
+            return "🤖 Could not load models list right now. Try again shortly or use <code>/m provider/model [task]</code>.", None
         self.menu_page = page
         return (f"🤖 <b>Select Model</b> (Current: <b>{esc(self.state['model'] or 'Default')}</b>)"
                 f"{' — Page ' + str(page) if page else ''}"), keyboard(rows)

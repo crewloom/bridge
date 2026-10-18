@@ -12,7 +12,7 @@ const https = require('node:https');
 const readline = require('node:readline');
 const { spawn, spawnSync } = require('node:child_process');
 
-const VERSION = '1.0.3';
+const VERSION = '1.0.4';
 const ROOT_DIR = path.resolve(__dirname, '..');
 const CORE_DIR = path.join(ROOT_DIR, 'core');
 const CONTROL_ROOM_SCRIPT = path.join(CORE_DIR, 'control_room.py');
