@@ -599,7 +599,8 @@ class OpenCode:
 
     def _url(self, path):
         sep = "&" if "?" in path else "?"
-        return f"{self.base}{path}{sep}directory={urllib.parse.quote(self.directory, safe="")}"
+        quoted_dir = urllib.parse.quote(self.directory, safe="")
+        return f"{self.base}{path}{sep}directory={quoted_dir}"
 
     def call(self, path, method="GET", body=None, timeout=30):
         data = json.dumps(body).encode() if body is not None else None
