@@ -39,6 +39,7 @@ test('ConfigManager - manages workspaces list cleanly', () => {
     assert.ok(cfg.config.workspaces.includes(path.resolve(tmpSub)));
   } finally {
     try {
+      cfg.removeWorkspace(tmpSub);
       fs.rmdirSync(tmpSub);
     } catch {}
   }

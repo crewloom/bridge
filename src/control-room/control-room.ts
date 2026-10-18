@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as child_process from 'node:child_process';
-import { TelegramClient, escapeHtml } from '../telegram/telegram-client.js';
+import { TelegramClient, escapeHtml, stripHtml } from '../telegram/telegram-client.js';
 import { OpenCodeClient, type OpenCodeEvent } from '../opencode/opencode-client.js';
 import { TelegramChannelAdapter } from '../channels/telegram.adapter.js';
 import { OpenCodeAdapter } from '../engines/opencode.adapter.js';
@@ -761,15 +761,22 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
   }
 
   private wrapKeyboard(rows: InlineKeyboardButton[][]): ChannelKeyboard & InlineKeyboardMarkup {
+    const cleanRows = rows.map((r) =>
+      r.map((btn) => ({
+        text: stripHtml(btn.text).replace(/^[⚡\s]+/, '').trim(),
+        callback_data: btn.callback_data,
+      }))
+    );
+
     return {
-      rows: rows.map((r) =>
+      rows: cleanRows.map((r) =>
         r.map((btn) => ({
           text: btn.text,
           callbackData: btn.callback_data,
           callback_data: btn.callback_data,
         }))
       ),
-      inline_keyboard: rows,
+      inline_keyboard: cleanRows,
     } as ChannelKeyboard & InlineKeyboardMarkup;
   }
 
@@ -789,7 +796,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       }
     }
     if (currentRow.length > 0) rows.push(currentRow);
-    rows.push([{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,
@@ -806,7 +813,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
         callback_data: `md:${idx}`,
       },
     ]);
-    rows.push([{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,
@@ -823,7 +830,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
         { text: `${this.currentMode === 'auto' ? '● ' : ''}⚡ Auto Mode`, callback_data: 'mo:auto' },
       ],
       [
-        { text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' },
+        { text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' },
       ],
     ];
 
@@ -844,7 +851,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
         callback_data: `se:${this.activeRun.sessionId}`,
       }]);
     }
-    rows.push([{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,
@@ -908,7 +915,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     const rows: InlineKeyboardButton[][] = skillsList.map((sk) => [
       { text: `🧰 ${sk}`, callback_data: `sk:${sk}` },
     ]);
-    rows.push([{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,
@@ -937,7 +944,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     const rows: InlineKeyboardButton[][] = [
       [{ text: `${cur === 'en' ? '● ' : ''}🇺🇸 English`, callback_data: 'lang:en' }],
       [{ text: `${cur === 'ar' ? '● ' : ''}🇸🇦 العربية`, callback_data: 'lang:ar' }],
-      [{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }],
+      [{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }],
     ];
 
     await this.channel.sendMessage(
@@ -988,7 +995,7 @@ Agent: <b>${escapeHtml(this.currentAgent)}</b> | Mode: <b>${escapeHtml(this.curr
         callback_data: `ws:${i}`,
       },
     ]);
-    rows.push([{ text: '⬅️ ' + t('help_title', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: '⬅️ ' + t('btn_help', this.language), callback_data: 'hp' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,

@@ -105,7 +105,7 @@ export class ConfigManager {
       engine: 'opencode',
       denyPatterns: [],
       allowedPaths: [],
-      workspaces: [resolvedTarget],
+      workspaces: resolvedTarget.startsWith(os.tmpdir()) ? [] : [resolvedTarget],
       extra: {},
     };
 
@@ -181,12 +181,20 @@ export class ConfigManager {
     if (Array.isArray(data.deny_patterns)) this.config.denyPatterns = data.deny_patterns.map(String);
     if (Array.isArray(data.allowed_paths)) this.config.allowedPaths = data.allowed_paths.map(String);
     if (Array.isArray(data.workspaces)) {
+      this.config.workspaces = [];
       for (const w of data.workspaces) {
         const resolved = path.resolve(String(w));
-        if (!this.config.workspaces.includes(resolved)) {
+        if (fs.existsSync(resolved) && !resolved.startsWith(os.tmpdir()) && !this.config.workspaces.includes(resolved)) {
           this.config.workspaces.push(resolved);
         }
       }
+    }
+    if (
+      fs.existsSync(this.config.targetDir) &&
+      !this.config.targetDir.startsWith(os.tmpdir()) &&
+      !this.config.workspaces.includes(this.config.targetDir)
+    ) {
+      this.config.workspaces.unshift(this.config.targetDir);
     }
   }
 
@@ -244,6 +252,17 @@ export class ConfigManager {
       this.saveGlobal();
     }
     return true;
+  }
+
+  public removeWorkspace(workspace: string): boolean {
+    const resolved = path.resolve(workspace);
+    const idx = this.config.workspaces.indexOf(resolved);
+    if (idx !== -1) {
+      this.config.workspaces.splice(idx, 1);
+      this.saveGlobal();
+      return true;
+    }
+    return false;
   }
 
   public validate(): string[] {
