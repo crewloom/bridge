@@ -60,6 +60,17 @@ class MockChannelAdapter implements IChannelAdapter {
   public async sendChatAction(_recipientId: string, action?: string): Promise<void> {
     this.chatActions.push(action || 'typing');
   }
+
+  public answeredInlineQueries: Array<{ id: string; results: unknown[]; options?: unknown }> = [];
+
+  public async answerInlineQuery(
+    inlineQueryId: string,
+    results: unknown[],
+    options?: { cacheTime?: number; isPersonal?: boolean }
+  ): Promise<boolean> {
+    this.answeredInlineQueries.push({ id: inlineQueryId, results, options });
+    return true;
+  }
 }
 
 class MockAgentEngine extends EventEmitter implements IAgentEngine {
@@ -230,9 +241,10 @@ test('ControlRoom - getMainKeyboard provides complete 5-row 14-button mission co
   assert.equal(kb.rows[3]?.[1]?.callbackData, 'us');
   assert.equal(kb.rows[3]?.[2]?.callbackData, 'menu:lg');
 
-  // Row 5: Handoff, Help
+  // Row 5: Handoff, Help, Mentions
   assert.equal(kb.rows[4]?.[0]?.callbackData, 'ho');
   assert.equal(kb.rows[4]?.[1]?.callbackData, 'hp');
+  assert.equal(kb.rows[4]?.[2]?.callbackData, 'mention:hub');
 
   room.stop();
 });
@@ -494,6 +506,130 @@ test('ControlRoom - responds to conversational presence inquiries like "هل ا�
 
   const lastMsg2 = mockChan.sentMessages[mockChan.sentMessages.length - 1];
   assert.ok(lastMsg2.text.includes('AgentGram'), 'Must introduce AgentGram');
+
+  room.stop();
+});
+
+test('ControlRoom - handleUserMessage handles @ to open Mentions Hub with interactive keyboard', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  await (room as any).handleUserMessage({
+    id: 201,
+    chatId: '123456789',
+    senderId: '123456789',
+    text: '@',
+    timestamp: Date.now(),
+  });
+
+  const lastMsg = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(lastMsg, 'Must send Mentions Hub card');
+  assert.ok(
+    lastMsg.text.includes('Mentions & Instant Shortcuts Hub') ||
+    lastMsg.text.includes('مركز المنشن والاختصارات السريعة'),
+    'Must contain Mentions Hub title'
+  );
+  assert.ok(lastMsg.text.includes('@pinpoint_go'));
+  assert.ok(lastMsg.text.includes('@claude'));
+
+  // Verify inline buttons exist in the hub
+  const kb = lastMsg.options?.replyMarkup;
+  assert.ok(kb, 'Must have replyMarkup');
+  assert.ok(kb.rows.some((row) => row.some((btn) => btn.callbackData === 'mention:skills')));
+  assert.ok(kb.rows.some((row) => row.some((btn) => btn.callbackData === 'mention:skill:pinpoint_go')));
+  assert.ok(kb.rows.some((row) => row.some((btn) => btn.switchInlineQueryCurrentChat !== undefined)));
+
+  room.stop();
+});
+
+test('ControlRoom - handleUserMessage handles @agent and @model mentions with instant switching', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  // 1. Switch Agent with @plan
+  await (room as any).handleUserMessage({
+    id: 202,
+    chatId: '123456789',
+    senderId: '123456789',
+    text: '@plan',
+    timestamp: Date.now(),
+  });
+  assert.equal(room.currentAgent, 'plan', 'Must switch currentAgent to plan');
+  const agentMsg = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(agentMsg.text.includes('Active Agent switched to: <b>plan</b>'));
+
+  // 2. Switch Model with @claude
+  await (room as any).handleUserMessage({
+    id: 203,
+    chatId: '123456789',
+    senderId: '123456789',
+    text: '@claude',
+    timestamp: Date.now(),
+  });
+  assert.equal(room.currentModel, 'claude-3-5-sonnet', 'Must switch currentModel to claude-3-5-sonnet');
+  const modelMsg = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(modelMsg.text.includes('Claude 3.5 Sonnet'));
+  assert.ok(modelMsg.text.includes('200k'));
+
+  // 3. Switch Agent and submit prompt concurrently
+  await (room as any).handleUserMessage({
+    id: 204,
+    chatId: '123456789',
+    senderId: '123456789',
+    text: '@build implement database migration',
+    timestamp: Date.now(),
+  });
+  assert.equal(room.currentAgent, 'build', 'Must switch currentAgent to build');
+  assert.ok(
+    mockEng.submittedPrompts.some((p) => p.prompt === 'implement database migration'),
+    'Must submit prompt to engine after switching agent'
+  );
+
+  room.stop();
+});
+
+test('ControlRoom - handleInlineQuery returns matched skills, models, and agents', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  // Query skills matching 'front'
+  await (room as any).handleInlineQuery({
+    id: 'iq-100',
+    senderId: '123456789',
+    query: 'front',
+    offset: '',
+  });
+
+  assert.equal(mockChan.answeredInlineQueries.length, 1);
+  const q1 = mockChan.answeredInlineQueries[0];
+  assert.equal(q1.id, 'iq-100');
+  const results = q1.results as any[];
+  assert.ok(results.length > 0);
+  assert.ok(results.some((r) => r.title.includes('frontend')));
 
   room.stop();
 });

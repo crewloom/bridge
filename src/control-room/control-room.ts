@@ -16,6 +16,7 @@ import type {
   ChannelKeyboard,
   IncomingChannelMessage,
   IncomingChannelAction,
+  IncomingChannelInlineQuery,
 } from '../channels/channel.interface.js';
 import type {
   IAgentEngine,
@@ -24,12 +25,13 @@ import type {
 import { SecurityPolicy } from '../security/policy.js';
 import { ConfigManager } from '../config/config-manager.js';
 import { t } from '../i18n/index.js';
-import { resolveModelMetadata, getStandardModelCatalog } from '../domain/model-catalog.js';
+import { resolveModelMetadata, getStandardModelCatalog, KNOWN_MODELS } from '../domain/model-catalog.js';
 import type {
   ExecutionMode,
   InlineKeyboardMarkup,
   InlineKeyboardButton,
   OpenCodeRun,
+  TelegramInlineQueryResultArticle,
 } from '../domain/types.js';
 
 export const SYSTEM_HEADER = (targetDir: string) => `
@@ -240,6 +242,12 @@ export class ControlRoom {
         }
         await this.handleCallback(action.id, action.actionData, action.messageId);
       },
+      onInlineQuery: async (iq: IncomingChannelInlineQuery) => {
+        if (this.channel.id === 'telegram' && this.allowedChatId && iq.senderId !== this.allowedChatId) {
+          return;
+        }
+        await this.handleInlineQuery(iq);
+      },
       onError: (err: Error) => {
         console.error('Channel error:', err.message);
       },
@@ -346,8 +354,14 @@ export class ControlRoom {
       return;
     }
 
+    // Mentions Hub (@)
+    if (text === '@' || text === '@hub' || text === '@mentions' || text === '/mentions') {
+      await this.sendMentionsHub();
+      return;
+    }
+
     // Commands
-    if (text === '/start' || text === '/help') {
+    if (text === '/start' || text === '/help' || text === '@help') {
       await this.channel.sendMessage(
         this.allowedChatId,
         `⚡ <b>AgentGram v2.0.0 · Mission Control</b>\n${t('help_title', this.language)}`,
@@ -356,32 +370,32 @@ export class ControlRoom {
       return;
     }
 
-    if (text === '/status' || text === 'st') {
+    if (text === '/status' || text === '@status' || text === 'st') {
       await this.sendStatusReport();
       return;
     }
 
-    if (text === '/agents') {
+    if (text === '/agents' || text === '@agents') {
       await this.sendAgentsMenu();
       return;
     }
 
-    if (text === '/models') {
+    if (text === '/models' || text === '@models') {
       await this.sendModelsMenu();
       return;
     }
 
-    if (text === '/mode') {
+    if (text === '/mode' || text === '@mode') {
       await this.sendModeMenu();
       return;
     }
 
-    if (text === '/sessions') {
+    if (text === '/sessions' || text === '@sessions') {
       await this.sendSessionsMenu();
       return;
     }
 
-    if (text === '/new') {
+    if (text === '/new' || text === '@new') {
       this.activeRun = null;
       await this.channel.sendMessage(
         this.allowedChatId,
@@ -391,27 +405,27 @@ export class ControlRoom {
       return;
     }
 
-    if (text === '/diff') {
+    if (text === '/diff' || text === '@diff') {
       await this.sendDiff();
       return;
     }
 
-    if (text === '/skills') {
+    if (text === '/skills' || text === '@skills') {
       await this.sendSkillsMenu();
       return;
     }
 
-    if (text === '/usage') {
+    if (text === '/usage' || text === '@usage') {
       await this.sendUsageReport();
       return;
     }
 
-    if (text === '/handoff') {
+    if (text === '/handoff' || text === '@handoff') {
       await this.sendHandoffReport();
       return;
     }
 
-    if (text === '/stop') {
+    if (text === '/stop' || text === '@stop') {
       await this.abortCurrentRun();
       return;
     }
@@ -432,13 +446,92 @@ export class ControlRoom {
       return;
     }
 
-    // Resolve Skill and Tool Slash Commands (e.g. /pinpoint_go, /query_perf, /frontend)
+    // Resolve Skill, Model, Agent, and Tool Commands (e.g. /pinpoint_go, @claude, @plan, @frontend)
     if (text.startsWith('/') || text.startsWith('@')) {
       const parts = text.slice(1).trim().split(/\s+/);
       const rawCmd = (parts[0] || '').toLowerCase();
       const rest = parts.slice(1).join(' ').trim();
       const cleanCmd = rawCmd.replace(/[-@]/g, '_');
 
+      // 1. Check Agent mentions: @build, @plan, @review, @delegate, @explorer, @code_review
+      const validAgents = ['build', 'plan', 'review', 'delegate', 'explorer', 'code_review', 'code-review'];
+      if (validAgents.includes(cleanCmd) || cleanCmd === 'agent') {
+        let targetAgent = cleanCmd;
+        let nextRest = rest;
+        if (cleanCmd === 'agent') {
+          const subParts = rest.split(/\s+/);
+          targetAgent = (subParts[0] || 'build').toLowerCase().replace('-', '_');
+          nextRest = subParts.slice(1).join(' ').trim();
+        }
+        if (targetAgent === 'code_review') targetAgent = 'code-review';
+        this.currentAgent = targetAgent;
+        this.cfgManager.config.defaultAgent = targetAgent;
+        this.cfgManager.saveGlobal();
+
+        if (nextRest) {
+          if (nextRest.startsWith('@') || nextRest.startsWith('/')) {
+            await this.handleUserMessage({ ...msg, text: nextRest });
+          } else {
+            await this.guardedSubmit(nextRest, msg.id);
+          }
+          return;
+        } else {
+          await this.channel.sendMessage(
+            this.allowedChatId,
+            `🤖 Active Agent switched to: <b>${escapeHtml(targetAgent)}</b> ⚡\n<i>Send your instructions to execute with this agent.</i>`,
+            { replyMarkup: this.getMainKeyboard() }
+          );
+          return;
+        }
+      }
+
+      // 2. Check Model mentions: @claude, @gemini, @gpt4o, @deepseek, etc.
+      const modelShortcutMap: Record<string, string> = {
+        claude: 'claude-3-5-sonnet',
+        sonnet: 'claude-3-5-sonnet',
+        haiku: 'claude-3-5-haiku',
+        opus: 'claude-3-opus',
+        gemini: 'gemini-2.0-flash',
+        gpt4o: 'gpt-4o',
+        gpt_4o: 'gpt-4o',
+        gpt: 'gpt-4o',
+        o1: 'o1',
+        o3: 'o3-mini',
+        o3_mini: 'o3-mini',
+        deepseek: 'deepseek-chat',
+        deepseek_r1: 'deepseek-chat',
+      };
+
+      const matchedModelKey =
+        modelShortcutMap[cleanCmd] ||
+        (KNOWN_MODELS[rawCmd] ? rawCmd : KNOWN_MODELS[cleanCmd.replace(/_/g, '-')] ? cleanCmd.replace(/_/g, '-') : null);
+
+      if (matchedModelKey) {
+        this.currentModel = matchedModelKey;
+        this.cfgManager.config.defaultModel = matchedModelKey;
+        this.cfgManager.saveGlobal();
+
+        const meta = resolveModelMetadata(matchedModelKey);
+        if (rest) {
+          if (rest.startsWith('@') || rest.startsWith('/')) {
+            await this.handleUserMessage({ ...msg, text: rest });
+          } else {
+            await this.guardedSubmit(rest, msg.id);
+          }
+          return;
+        } else {
+          await this.channel.sendMessage(
+            this.allowedChatId,
+            `🧠 Active Model switched to: <b>${escapeHtml(meta.name)}</b> (${escapeHtml(meta.provider)})\n` +
+            `<code>سياق الذاكرة: ${escapeHtml(meta.contextWindow)} | ${escapeHtml(meta.tag)}</code>\n\n` +
+            `<i>Send your prompt to execute with this model.</i>`,
+            { replyMarkup: this.getMainKeyboard() }
+          );
+          return;
+        }
+      }
+
+      // 3. Built-in Ops & Tools
       if (cleanCmd === 'pinpoint_go') {
         const script = path.join(this.targetDir, 'tools', 'ai', 'pinpoint_go.sh');
         const sub = rest || 'prod-status';
@@ -469,6 +562,7 @@ export class ControlRoom {
         return;
       }
 
+      // 4. Governed Skills
       const allSkills = this.getAllAvailableSkills();
       const matchedSkill = allSkills.find((s) => {
         const sClean = s.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
@@ -478,7 +572,11 @@ export class ControlRoom {
       if (matchedSkill) {
         if (rest) {
           this.activeSkill = matchedSkill.name;
-          await this.guardedSubmit(rest, msg.id);
+          if (rest.startsWith('@') || rest.startsWith('/')) {
+            await this.handleUserMessage({ ...msg, text: rest });
+          } else {
+            await this.guardedSubmit(rest, msg.id);
+          }
           return;
         } else {
           this.activeSkill = matchedSkill.name;
@@ -621,6 +719,57 @@ export class ControlRoom {
         t('welcome', this.language, { target: escapeHtml(this.targetDir) }),
         { replyMarkup: this.getMainKeyboard() }
       );
+      return;
+    }
+
+    // Mentions & Shortcuts Hub callbacks
+    if (data === 'mention:hub') {
+      await this.sendMentionsHub();
+      return;
+    }
+    if (data === 'mention:skills') {
+      await this.sendSkillsMenu(0);
+      return;
+    }
+    if (data === 'mention:models') {
+      await this.sendModelsMenu(0);
+      return;
+    }
+    if (data === 'mention:agents') {
+      await this.sendAgentsMenu();
+      return;
+    }
+    if (data.startsWith('mention:skill:')) {
+      const skillName = data.slice('mention:skill:'.length);
+      await this.handleUserMessage({
+        id: Date.now(),
+        senderId: this.allowedChatId,
+        chatId: this.allowedChatId,
+        text: `@${skillName}`,
+        timestamp: Date.now(),
+      });
+      return;
+    }
+    if (data.startsWith('mention:model:')) {
+      const modelName = data.slice('mention:model:'.length);
+      await this.handleUserMessage({
+        id: Date.now(),
+        senderId: this.allowedChatId,
+        chatId: this.allowedChatId,
+        text: `@${modelName}`,
+        timestamp: Date.now(),
+      });
+      return;
+    }
+    if (data.startsWith('mention:agent:')) {
+      const agentName = data.slice('mention:agent:'.length);
+      await this.handleUserMessage({
+        id: Date.now(),
+        senderId: this.allowedChatId,
+        chatId: this.allowedChatId,
+        text: `@${agentName}`,
+        timestamp: Date.now(),
+      });
       return;
     }
 
@@ -999,6 +1148,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       [
         { text: t('btn_handoff', this.language), callback_data: 'ho' },
         { text: t('btn_help', this.language), callback_data: 'hp' },
+        { text: this.language === 'ar' ? '⚡ المنشن (@)' : '⚡ Mentions (@)', callback_data: 'mention:hub' },
       ],
     ];
 
@@ -1010,6 +1160,9 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       r.map((btn) => ({
         text: stripHtml(btn.text).replace(/^[⚡\s]+/, '').trim(),
         callback_data: btn.callback_data,
+        url: btn.url,
+        switch_inline_query_current_chat: btn.switch_inline_query_current_chat,
+        switch_inline_query: btn.switch_inline_query,
       }))
     );
 
@@ -1019,6 +1172,8 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
           text: btn.text,
           callbackData: btn.callback_data,
           callback_data: btn.callback_data,
+          url: btn.url,
+          switchInlineQueryCurrentChat: btn.switch_inline_query_current_chat,
         }))
       ),
       inline_keyboard: cleanRows,
@@ -1357,6 +1512,160 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       cardText.trim(),
       { replyMarkup: this.wrapKeyboard(rows) }
     );
+  }
+
+  public async sendMentionsHub(): Promise<void> {
+    const isAr = this.language === 'ar';
+
+    const card = isAr
+      ? `⚡ <b>مركز المنشن والاختصارات السريعة (@)</b>\n\n` +
+        `اختر ما يناسبك أدناه أو اكتب في الشات <code>@name</code> مباشرة:\n\n` +
+        `🧰 <b>المهارات السريعة (Skills):</b>\n` +
+        `• <code>@pinpoint_go</code> — نشر وفحص Pinpoint Ops على السيرفر\n` +
+        `• <code>@frontend</code> — حوكمة Vue 3 / Inertia / Admin-Vue\n` +
+        `• <code>@erp_debug</code> — تدقيق ERP والقيود المزدوجة\n` +
+        `• <code>@query_perf</code> — فحص أداء الاستعلامات والفهارس\n\n` +
+        `🧠 <b>الموديلات وسياق الذاكرة (Models):</b>\n` +
+        `• <code>@claude</code> — Claude 3.5 Sonnet (200k)\n` +
+        `• <code>@gemini</code> — Gemini 2.0 Flash (1M)\n` +
+        `• <code>@gpt4o</code> — GPT-4o (128k)\n` +
+        `• <code>@deepseek</code> — DeepSeek Chat (128k)\n\n` +
+        `🤖 <b>الأيجنتس (Agents):</b>\n` +
+        `• <code>@build</code> — مهندس التنفيذ المباشر\n` +
+        `• <code>@plan</code> — التخطيط والتحليل المعماري\n` +
+        `• <code>@review</code> — مراجعة وتدقيق الجودة\n\n` +
+        `<i>💡 نصيحة: يمكنك كتابة <code>@frontend ظبط أزرار المودال</code> أو <code>@plan خطط للميزة</code></i>`
+      : `⚡ <b>Mentions & Instant Shortcuts Hub (@)</b>\n\n` +
+        `Select from below or type <code>@name</code> directly in chat:\n\n` +
+        `🧰 <b>Governed Skills:</b>\n` +
+        `• <code>@pinpoint_go</code> — Run Pinpoint Ops test, deploy & status\n` +
+        `• <code>@frontend</code> — Vue 3 / Inertia / Admin-Vue design laws\n` +
+        `• <code>@erp_debug</code> — ERP double-entry & ledger diagnostics\n` +
+        `• <code>@query_perf</code> — Query performance & index audit\n\n` +
+        `🧠 <b>AI Models & Context Window:</b>\n` +
+        `• <code>@claude</code> — Claude 3.5 Sonnet (200k)\n` +
+        `• <code>@gemini</code> — Gemini 2.0 Flash (1M)\n` +
+        `• <code>@gpt4o</code> — GPT-4o (128k)\n` +
+        `• <code>@deepseek</code> — DeepSeek Chat (128k)\n\n` +
+        `🤖 <b>Agents:</b>\n` +
+        `• <code>@build</code> — Primary code builder\n` +
+        `• <code>@plan</code> — Architecture & planning\n` +
+        `• <code>@review</code> — Quality & security review\n\n` +
+        `<i>💡 Tip: Prefix any prompt, e.g. <code>@frontend fix buttons</code> or <code>@plan design schema</code></i>`;
+
+    const rows: InlineKeyboardButton[][] = [
+      [
+        { text: isAr ? '🧰 كل المهارات' : '🧰 All Skills', callback_data: 'mention:skills' },
+        { text: isAr ? '🧠 كل الموديلات' : '🧠 All Models', callback_data: 'mention:models' },
+        { text: isAr ? '🤖 كل الأيجنتس' : '🤖 All Agents', callback_data: 'mention:agents' },
+      ],
+      [
+        { text: '🚀 @pinpoint_go', callback_data: 'mention:skill:pinpoint_go' },
+        { text: '🎨 @frontend', callback_data: 'mention:skill:frontend' },
+      ],
+      [
+        { text: '💼 @erp_debug', callback_data: 'mention:skill:erp_debug' },
+        { text: '⚡ @query_perf', callback_data: 'mention:skill:query_perf' },
+      ],
+      [
+        { text: '🧠 @claude', callback_data: 'mention:model:claude' },
+        { text: '🧠 @gemini', callback_data: 'mention:model:gemini' },
+        { text: '🧠 @gpt4o', callback_data: 'mention:model:gpt4o' },
+      ],
+      [
+        { text: '🤖 @build', callback_data: 'mention:agent:build' },
+        { text: '🤖 @plan', callback_data: 'mention:agent:plan' },
+        { text: '🤖 @review', callback_data: 'mention:agent:review' },
+      ],
+      [
+        {
+          text: isAr ? '🔍 البحث الحي بالمنشن (@)' : '🔍 Live Mentions Search (@)',
+          switch_inline_query_current_chat: '',
+        },
+      ],
+      [
+        { text: t('btn_back', this.language), callback_data: 'menu:home' },
+      ],
+    ];
+
+    await this.channel.sendMessage(this.allowedChatId, card, {
+      replyMarkup: this.wrapKeyboard(rows),
+    });
+  }
+
+  public async handleInlineQuery(iq: IncomingChannelInlineQuery): Promise<void> {
+    if (!this.channel.answerInlineQuery) return;
+
+    const query = (iq.query || '').trim().toLowerCase();
+    const allSkills = this.getAllAvailableSkills();
+    const allModels = getStandardModelCatalog();
+    const agents = ['build', 'plan', 'review'];
+
+    const results: TelegramInlineQueryResultArticle[] = [];
+
+    // 1. Matched / Top Skills
+    for (const sk of allSkills) {
+      const skClean = sk.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      if (
+        !query ||
+        sk.name.toLowerCase().includes(query) ||
+        skClean.includes(query) ||
+        (sk.description && sk.description.toLowerCase().includes(query))
+      ) {
+        results.push({
+          type: 'article',
+          id: `sk_${skClean}`,
+          title: `🧰 @${sk.name}`,
+          description: sk.description ? sk.description.slice(0, 80) : `Run ${sk.name} skill`,
+          input_message_content: {
+            message_text: `/${skClean}`,
+          },
+        });
+        if (results.length >= 25) break;
+      }
+    }
+
+    // 2. Matched / Top Models
+    for (const mId of allModels) {
+      const meta = resolveModelMetadata(mId);
+      if (
+        !query ||
+        mId.toLowerCase().includes(query) ||
+        meta.name.toLowerCase().includes(query) ||
+        meta.provider.toLowerCase().includes(query)
+      ) {
+        results.push({
+          type: 'article',
+          id: `md_${mId}`,
+          title: `🧠 @${meta.name} (${meta.contextWindow})`,
+          description: `${meta.provider} · ${meta.tag}`,
+          input_message_content: {
+            message_text: `@${mId}`,
+          },
+        });
+        if (results.length >= 40) break;
+      }
+    }
+
+    // 3. Matched Agents
+    for (const ag of agents) {
+      if (!query || ag.includes(query)) {
+        results.push({
+          type: 'article',
+          id: `ag_${ag}`,
+          title: `🤖 @${ag}`,
+          description: `Switch active agent to ${ag}`,
+          input_message_content: {
+            message_text: `@${ag}`,
+          },
+        });
+      }
+    }
+
+    await this.channel.answerInlineQuery(iq.id, results.slice(0, 50), {
+      cacheTime: 10,
+      isPersonal: true,
+    });
   }
 
   private async sendUsageReport(): Promise<void> {

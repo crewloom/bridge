@@ -62,6 +62,8 @@ export interface InlineKeyboardButton {
   text: string;
   callback_data?: string | undefined;
   url?: string | undefined;
+  switch_inline_query_current_chat?: string | undefined;
+  switch_inline_query?: string | undefined;
 }
 
 export interface InlineKeyboardMarkup {
@@ -109,10 +111,30 @@ export interface CallbackQuery {
   data?: string;
 }
 
+export interface TelegramInlineQuery {
+  id: string;
+  from: TelegramUser;
+  query: string;
+  offset: string;
+  chat_type?: string;
+}
+
+export interface TelegramInlineQueryResultArticle {
+  type: 'article';
+  id: string;
+  title: string;
+  description?: string;
+  input_message_content: {
+    message_text: string;
+    parse_mode?: 'HTML' | 'Markdown' | undefined;
+  };
+}
+
 export interface TelegramUpdate {
   update_id: number;
   message?: TelegramMessage;
   callback_query?: CallbackQuery;
+  inline_query?: TelegramInlineQuery;
 }
 
 // OpenCode Engine Models

@@ -208,8 +208,26 @@ export class TelegramClient {
     return await this.callApi<TelegramUpdate[]>('getUpdates', {
       offset,
       timeout,
-      allowed_updates: ['message', 'callback_query'],
+      allowed_updates: ['message', 'callback_query', 'inline_query'],
     });
+  }
+
+  public async answerInlineQuery(
+    inlineQueryId: string,
+    results: unknown[],
+    options?: { cacheTime?: number; isPersonal?: boolean }
+  ): Promise<boolean> {
+    const payload: Record<string, unknown> = {
+      inline_query_id: inlineQueryId,
+      results,
+      cache_time: options?.cacheTime ?? 5,
+      is_personal: options?.isPersonal ?? true,
+    };
+    try {
+      return await this.callApi<boolean>('answerInlineQuery', payload);
+    } catch {
+      return false;
+    }
   }
 
   public async getMe(): Promise<{ id: number; username?: string; first_name: string }> {

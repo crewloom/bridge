@@ -8,6 +8,7 @@ export interface ChannelButton {
   text: string;
   callbackData?: string | undefined;
   url?: string | undefined;
+  switchInlineQueryCurrentChat?: string | undefined;
 }
 
 export interface ChannelKeyboard {
@@ -46,9 +47,19 @@ export interface IncomingChannelAction {
   raw?: unknown;
 }
 
+export interface IncomingChannelInlineQuery {
+  id: string;
+  senderId: string;
+  query: string;
+  offset: string;
+  chatType?: string | undefined;
+  raw?: unknown;
+}
+
 export interface ChannelUpdateHandler {
   onMessage(msg: IncomingChannelMessage): Promise<void>;
   onAction(action: IncomingChannelAction): Promise<void>;
+  onInlineQuery?(query: IncomingChannelInlineQuery): Promise<void>;
   onError?(err: Error): void;
 }
 
@@ -99,4 +110,13 @@ export interface IChannelAdapter {
    * Optional: Register slash commands for native autocomplete in channel client.
    */
   registerCommands?(commands: Array<{ command: string; description: string }>): Promise<void>;
+
+  /**
+   * Optional: Answer native inline search queries.
+   */
+  answerInlineQuery?(
+    inlineQueryId: string,
+    results: unknown[],
+    options?: { cacheTime?: number; isPersonal?: boolean }
+  ): Promise<boolean>;
 }
