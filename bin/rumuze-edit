@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-# Backward-compatible rumuze-edit CLI wrapper
-
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(dirname "$DIR")"
-
-exec node "$ROOT/dist/index.js" "$@"

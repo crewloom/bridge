@@ -20,8 +20,7 @@ COPY package.json tsconfig.json tsup.config.ts LICENSE README.md ./
 COPY src/ ./src/
 RUN npm install && npm run build
 
-COPY bin/ ./bin/
-RUN chmod +x dist/index.js bin/agentgram bin/agentgram.js
+RUN chmod +x dist/index.js
 
 # Setup workspace and config directories
 RUN mkdir -p /workspace /root/.config/agentgram

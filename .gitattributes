@@ -1,0 +1,4 @@
+# Language overrides for GitHub Linguist
+dist/** linguist-vendored
+*.json linguist-documentation
+templates/** linguist-documentation

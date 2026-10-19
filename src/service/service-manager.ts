@@ -22,11 +22,8 @@ export const LINUX_SERVICE_PATH = path.join(LINUX_SERVICE_DIR, LINUX_SERVICE_NAM
 export const LEGACY_LINUX_SERVICE_PATH = path.join(LINUX_SERVICE_DIR, LEGACY_LINUX_SERVICE_NAME);
 
 export function getEntryPoint(): string {
-  // Locate dist/index.js or bin/agentgram.js
   const root = path.resolve(__dirname, '..');
-  const distEntry = path.join(root, 'dist', 'index.js');
-  if (fs.existsSync(distEntry)) return distEntry;
-  return path.join(root, 'bin', 'agentgram.js');
+  return path.join(root, 'dist', 'index.js');
 }
 
 export class ServiceManager {

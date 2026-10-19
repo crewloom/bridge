@@ -1,7 +1,0 @@
-#!/usr/bin/env bash
-# AgentGram CLI wrapper for Bash and Composer environments
-
-DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(dirname "$DIR")"
-
-exec node "$ROOT/dist/index.js" "$@"
