@@ -441,9 +441,10 @@ export class ControlRoom {
 
       if (cleanCmd === 'pinpoint_go') {
         const script = path.join(this.targetDir, 'tools', 'ai', 'pinpoint_go.sh');
+        const sub = rest || 'prod-status';
         const runCmd = fs.existsSync(script)
-          ? `bash tools/ai/pinpoint_go.sh ${rest}`.trim()
-          : `tools/ai/pinpoint_go.sh ${rest}`.trim();
+          ? `bash tools/ai/pinpoint_go.sh ${sub}`.trim()
+          : `tools/ai/pinpoint_go.sh ${sub}`.trim();
         await this.guardedSubmit(runCmd, msg.id);
         return;
       }

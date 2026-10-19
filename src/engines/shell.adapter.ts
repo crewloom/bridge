@@ -144,12 +144,25 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
 
     return new Promise((resolve, reject) => {
       try {
-        const proc = child_process.spawn(command, args, {
-          cwd: this.workspaceDir,
-          shell: this.cliCommand === 'sh' || this.cliCommand === 'bash',
-          stdio: ['pipe', 'pipe', 'pipe'],
-          env: { ...process.env },
-        });
+        const isShell = this.cliCommand === 'sh' || this.cliCommand === 'bash';
+        const proc = isShell
+          ? child_process.spawn(resolvedPrompt, [], {
+              cwd: this.workspaceDir,
+              shell: true,
+              stdio: ['pipe', 'pipe', 'pipe'],
+              env: { ...process.env },
+            })
+          : child_process.spawn(command, args, {
+              cwd: this.workspaceDir,
+              shell: false,
+              stdio: ['pipe', 'pipe', 'pipe'],
+              env: { ...process.env },
+            });
+
+        // Close stdin immediately so commands never block on interactive read(0)
+        try {
+          proc.stdin?.end();
+        } catch {}
 
         this.activeProcess = proc;
         let stdout = '';
