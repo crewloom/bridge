@@ -12,6 +12,7 @@ venv/
 *.egg-info/
 dist/
 build/
+*.tgz
 
 # Node
 node_modules/

@@ -24,6 +24,7 @@ import type {
 import { SecurityPolicy } from '../security/policy.js';
 import { ConfigManager } from '../config/config-manager.js';
 import { t } from '../i18n/index.js';
+import { resolveModelMetadata, getStandardModelCatalog } from '../domain/model-catalog.js';
 import type {
   ExecutionMode,
   InlineKeyboardMarkup,
@@ -597,7 +598,12 @@ export class ControlRoom {
 
     // 6. Skills
     if (data === 'menu:sk') {
-      await this.sendSkillsMenu();
+      await this.sendSkillsMenu(0);
+      return;
+    }
+    if (data.startsWith('skpage:')) {
+      const page = parseInt(data.slice(7), 10) || 0;
+      await this.sendSkillsMenu(page);
       return;
     }
     if (data.startsWith('sk:')) {
@@ -846,23 +852,34 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
 
   public async sendModelsMenu(page = 0): Promise<void> {
     const favs = this.cfgManager.config.favoriteModels || [];
-    let allModels: string[] = [];
+    let engineModels: string[] = [];
     if (typeof this.engine.listModels === 'function') {
       try {
         const raw = await this.engine.listModels();
-        allModels = (raw || []).map((m: { id: string }) => m.id);
+        engineModels = (raw || []).map((m: { id: string }) => m.id);
       } catch {}
     }
 
-    const rest = allModels.filter((m) => !favs.includes(m));
-    const pool = page === 0 ? favs : rest.slice((page - 1) * 10, page * 10);
+    const standardCatalog = getStandardModelCatalog();
+    const combinedSet = new Set<string>([...favs, ...engineModels, ...standardCatalog]);
+    const allModels = Array.from(combinedSet);
 
-    const rows: InlineKeyboardButton[][] = pool.map((m, idx) => [
-      {
-        text: `${m === this.currentModel ? '● ' : ''}${m}`,
-        callback_data: page === 0 ? `md:${idx}` : `md:raw:${m}`,
-      },
-    ]);
+    const rest = allModels.filter((m) => !favs.includes(m));
+    const pageSize = 6;
+    const pool = page === 0 ? favs : rest.slice((page - 1) * pageSize, page * pageSize);
+    const totalPages = Math.ceil(rest.length / pageSize) || 1;
+
+    const rows: InlineKeyboardButton[][] = pool.map((m, idx) => {
+      const meta = resolveModelMetadata(m);
+      const isCurrent = m === this.currentModel;
+      const cleanName = meta.name.length > 20 ? meta.name.slice(0, 18) + '…' : meta.name;
+      return [
+        {
+          text: `${isCurrent ? '● ' : ''}${cleanName} · ${meta.contextWindow}`,
+          callback_data: page === 0 ? `md:${idx}` : `md:raw:${m}`,
+        },
+      ];
+    });
 
     if (page === 0) {
       if (rest.length > 0) {
@@ -873,17 +890,32 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       const pagRow: InlineKeyboardButton[] = [
         { text: t('btn_favorites', this.language), callback_data: 'pg:0' },
       ];
-      if (rest.length > page * 10) {
+      if (rest.length > page * pageSize) {
         pagRow.push({ text: t('btn_next', this.language), callback_data: `pg:${page + 1}` });
       }
       rows.push(pagRow);
       rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:md' }]);
     }
 
+    const curMeta = resolveModelMetadata(this.currentModel);
+    let cardText = this.language === 'ar'
+      ? `🤖 <b>نماذج الذكاء الاصطناعي ومساحة السياق</b> ${page > 0 ? `(صفحة ${page} من ${totalPages})` : '(المفضلة)'}\nالنموذج النشط: <b>${escapeHtml(curMeta.name)}</b> (<code>${escapeHtml(curMeta.contextWindow)}</code>)\n\n`
+      : `🤖 <b>AI Models & Context Windows</b> ${page > 0 ? `(Page ${page} of ${totalPages})` : '(Favorites)'}\nActive: <b>${escapeHtml(curMeta.name)}</b> (<code>${escapeHtml(curMeta.contextWindow)}</code>)\n\n`;
+
+    for (const m of pool) {
+      const meta = resolveModelMetadata(m);
+      const isCurrent = m === this.currentModel;
+      cardText += `${isCurrent ? '●' : '•'} <b>${escapeHtml(meta.name)}</b> (<code>${escapeHtml(meta.provider)}</code>)\n`;
+      cardText += `  <code>السياق: ${escapeHtml(meta.contextWindow)} | ${escapeHtml(meta.tag)}</code>\n`;
+    }
+
+    cardText += this.language === 'ar'
+      ? `\n<i>اضغط على أي نموذج أدناه للتبديل إليه فوراً:</i>`
+      : `\n<i>Tap any model below to activate immediately:</i>`;
+
     await this.channel.sendMessage(
       this.allowedChatId,
-      t('select_model', this.language, { model: escapeHtml(this.currentModel || 'Default') }) +
-        (page > 0 ? ` — Page ${page}` : ''),
+      cardText.trim(),
       { replyMarkup: this.wrapKeyboard(rows) }
     );
   }
@@ -966,26 +998,121 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     });
   }
 
-  private async sendSkillsMenu(): Promise<void> {
-    let skillsList: string[] = [];
-    const skillsDir = path.join(this.targetDir, '.agents', 'skills');
-    if (fs.existsSync(skillsDir)) {
+  private getAllAvailableSkills(): Array<{ id: string; name: string; description?: string | undefined }> {
+    const candidates = [
+      path.join(this.targetDir, '.agents', 'skills'),
+      path.join(this.targetDir, 'docs', 'ai', 'skills'),
+      path.join(this.targetDir, '.gemini', 'skills'),
+    ];
+
+    const map = new Map<string, { id: string; name: string; description?: string | undefined }>();
+
+    for (const dir of candidates) {
+      if (!fs.existsSync(dir)) continue;
       try {
-        skillsList = fs.readdirSync(skillsDir).filter((f) => !f.startsWith('.')).slice(0, 10);
+        const items = fs.readdirSync(dir, { withFileTypes: true });
+        for (const item of items) {
+          if (!item.isDirectory() && !item.isSymbolicLink()) continue;
+          if (item.name.startsWith('.')) continue;
+
+          const raw = item.name;
+          const clean = raw.replace(/^\d+-/, '');
+
+          if (!map.has(clean)) {
+            let desc: string | undefined;
+            const skillMd = path.join(dir, raw, 'SKILL.md');
+            if (fs.existsSync(skillMd)) {
+              try {
+                const head = fs.readFileSync(skillMd, 'utf-8').slice(0, 600);
+                const m = head.match(/description:\s*["']?([^"'\n\r]+)/i);
+                if (m && m[1]) {
+                  desc = m[1].replace(/^[>"\s]+|[<"\s]+$/g, '').trim();
+                }
+              } catch {}
+            }
+
+            map.set(clean, {
+              id: clean,
+              name: clean,
+              description: desc,
+            });
+          }
+        }
       } catch {}
     }
-    if (skillsList.length === 0) {
-      skillsList = ['frontend', 'query-performance', 'erp-debug', 'security-audit', 'git-hygiene'];
+
+    if (map.size === 0) {
+      const defaults = [
+        'frontend',
+        'query-performance',
+        'erp-debug',
+        'security-audit',
+        'git-hygiene',
+        'financial-expert',
+        'rveta-core',
+        'laravel-architecture',
+      ];
+      defaults.forEach((d) => map.set(d, { id: d, name: d }));
     }
 
-    const rows: InlineKeyboardButton[][] = skillsList.map((sk) => [
-      { text: `🧰 ${sk}`, callback_data: `sk:${sk}` },
-    ]);
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  public async sendSkillsMenu(page = 0): Promise<void> {
+    const allSkills = this.getAllAvailableSkills();
+    const pageSize = 8;
+    const totalPages = Math.ceil(allSkills.length / pageSize) || 1;
+    const safePage = Math.min(Math.max(0, page), totalPages - 1);
+    const pool = allSkills.slice(safePage * pageSize, (safePage + 1) * pageSize);
+
+    const rows: InlineKeyboardButton[][] = [];
+    let currentRow: InlineKeyboardButton[] = [];
+    for (const sk of pool) {
+      const isCurrent = sk.name === this.activeSkill;
+      currentRow.push({
+        text: `${isCurrent ? '● ' : ''}🧰 ${sk.name}`,
+        callback_data: `sk:${sk.name}`,
+      });
+      if (currentRow.length === 2) {
+        rows.push(currentRow);
+        currentRow = [];
+      }
+    }
+    if (currentRow.length > 0) rows.push(currentRow);
+
+    // Pagination row
+    const pagRow: InlineKeyboardButton[] = [];
+    if (safePage > 0) {
+      pagRow.push({ text: '⬅️ السابق', callback_data: `skpage:${safePage - 1}` });
+    }
+    if (safePage < totalPages - 1) {
+      pagRow.push({ text: '➡️ المزيد من المهارات', callback_data: `skpage:${safePage + 1}` });
+    }
+    if (pagRow.length > 0) {
+      rows.push(pagRow);
+    }
+
+    // Dedicated back button row
     rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:home' }]);
+
+    let cardText = this.language === 'ar'
+      ? `🧰 <b>مهارات وكلاء الذكاء الاصطناعي (Agent Skills)</b> (صفحة ${safePage + 1} من ${totalPages} · إجمالي ${allSkills.length} مهارة)\nالمهارة المفعلة: <b>${escapeHtml(this.activeSkill || 'بدون (وكيل عام)')}</b>\n\n`
+      : `🧰 <b>Available Agent Skills</b> (Page ${safePage + 1} of ${totalPages} · Total: ${allSkills.length})\nActive: <b>${escapeHtml(this.activeSkill || 'None (Standard Agent)')}</b>\n\n`;
+
+    for (const sk of pool) {
+      const isCurrent = sk.name === this.activeSkill;
+      const descSnippet = sk.description ? sk.description.slice(0, 60) + (sk.description.length > 60 ? '…' : '') : 'مهارة متخصصة';
+      cardText += `${isCurrent ? '●' : '•'} <b>${escapeHtml(sk.name)}</b>\n`;
+      cardText += `  <code>${escapeHtml(descSnippet)}</code>\n`;
+    }
+
+    cardText += this.language === 'ar'
+      ? `\n<i>اختر المهارة لتوجيه الوكيل البرمجي للعمل بها فوراً:</i>`
+      : `\n<i>Select a skill to prime the agent for execution:</i>`;
 
     await this.channel.sendMessage(
       this.allowedChatId,
-      `🧰 <b>Available Skills</b>\nSelect a skill or send your coding prompt directly:`,
+      cardText.trim(),
       { replyMarkup: this.wrapKeyboard(rows) }
     );
   }

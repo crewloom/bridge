@@ -287,3 +287,61 @@ test('ControlRoom - start() continues and starts channel listening even if engin
 
   room.stop();
 });
+
+test('ControlRoom - sendModelsMenu formats model buttons and card with context window', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  cfg.config.favoriteModels = ['claude-3-5-sonnet', 'gemini-1.5-pro', 'gpt-4o'];
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  await room.sendModelsMenu(0);
+
+  const lastMsg = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(lastMsg);
+  // Verify message card mentions context window
+  assert.ok(lastMsg.text.includes('Context Windows') || lastMsg.text.includes('السياق'));
+  assert.ok(lastMsg.text.includes('200k') || lastMsg.text.includes('2M'));
+
+  // Verify button text contains context window token size
+  const rows = lastMsg.options?.replyMarkup?.rows || [];
+  const modelButtons = rows.flat().filter((b) => b.callbackData?.startsWith('md:'));
+  assert.ok(modelButtons.some((b) => b.text.includes('200k') || b.text.includes('2M')));
+
+  room.stop();
+});
+
+test('ControlRoom - sendSkillsMenu discovers skills and supports pagination', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  await room.sendSkillsMenu(0);
+
+  const lastMsg = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(lastMsg);
+  assert.ok(lastMsg.text.includes('Skills') || lastMsg.text.includes('المهارات'));
+
+  const rows = lastMsg.options?.replyMarkup?.rows || [];
+  const skillButtons = rows.flat().filter((b) => b.callbackData?.startsWith('sk:'));
+  assert.ok(skillButtons.length > 0, 'Must have skill buttons');
+
+  // Must have back button routing to menu:home
+  const backBtn = rows.flat().find((b) => b.callbackData === 'menu:home');
+  assert.ok(backBtn, 'Must have Back button');
+
+  room.stop();
+});
