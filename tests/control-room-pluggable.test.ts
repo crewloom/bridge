@@ -225,3 +225,65 @@ test('ControlRoom - getMainKeyboard provides complete 5-row 14-button mission co
 
   room.stop();
 });
+
+test('ControlRoom - sendModelsMenu separates All Models and Back buttons into distinct rows', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  cfg.config.favoriteModels = ['model-a', 'model-b'];
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+  // mockEng listModels provides additional models to trigger pagination/more button
+  mockEng.listModels = async () => [
+    { id: 'model-a' },
+    { id: 'model-b' },
+    { id: 'model-c' },
+    { id: 'model-d' },
+  ];
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  await room.sendModelsMenu(0);
+
+  const lastMsg = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(lastMsg);
+  const rows = lastMsg.options?.replyMarkup?.rows || [];
+
+  // Verify pool has favorites, then All Models on its own row, then Back on its own row
+  const allModelsBtnRow = rows.find((r) => r.some((b) => b.callbackData === 'pg:1'));
+  const backBtnRow = rows.find((r) => r.some((b) => b.callbackData === 'menu:home'));
+
+  assert.ok(allModelsBtnRow, 'Must have All Models button row');
+  assert.ok(backBtnRow, 'Must have Back button row');
+  assert.equal(allModelsBtnRow.length, 1, 'All Models must be on its own dedicated row');
+  assert.equal(backBtnRow.length, 1, 'Back must be on its own dedicated row');
+  assert.notStrictEqual(allModelsBtnRow, backBtnRow, 'All Models and Back must NEVER be in the same row');
+
+  room.stop();
+});
+
+test('ControlRoom - start() continues and starts channel listening even if engine connection fails', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+  // Engine throws on connect
+  mockEng.connect = async () => {
+    throw new Error('Connection refused by loopback');
+  };
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  // start() should not throw
+  await room.start();
+  assert.ok(room.isListening, 'Room must be listening even if engine connect failed');
+
+  room.stop();
+});

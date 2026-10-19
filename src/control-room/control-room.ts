@@ -203,14 +203,24 @@ export class ControlRoom {
   }
 
   public async start(): Promise<void> {
-    await this.engine.connect();
+    try {
+      await this.engine.connect();
+    } catch (err) {
+      console.warn('⚠️ Warning: Engine connection failed at startup:', (err as Error).message);
+    }
     this.isListening = true;
 
-    await this.channel.sendMessage(
-      this.allowedChatId,
-      t('welcome', this.language, { target: escapeHtml(this.targetDir) }),
-      { replyMarkup: this.getMainKeyboard() }
-    );
+    if (this.allowedChatId && this.allowedChatId.trim()) {
+      try {
+        await this.channel.sendMessage(
+          this.allowedChatId,
+          t('welcome', this.language, { target: escapeHtml(this.targetDir) }),
+          { replyMarkup: this.getMainKeyboard() }
+        );
+      } catch (err) {
+        console.warn('⚠️ Warning: Could not deliver initial welcome card:', (err as Error).message);
+      }
+    }
 
     await this.channel.startListening({
       onMessage: async (msg: IncomingChannelMessage) => {
@@ -449,6 +459,16 @@ export class ControlRoom {
       if (messageId !== undefined) {
         await this.channel.sendMessage(this.allowedChatId, t('permission_rejected', this.language, { tool: permId }));
       }
+      return;
+    }
+
+    // Navigation: Home / Back to Main
+    if (data === 'menu:home' || data === 'home') {
+      await this.channel.sendMessage(
+        this.allowedChatId,
+        t('welcome', this.language, { target: escapeHtml(this.targetDir) }),
+        { replyMarkup: this.getMainKeyboard() }
+      );
       return;
     }
 
@@ -815,7 +835,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       }
     }
     if (currentRow.length > 0) rows.push(currentRow);
-    rows.push([{ text: t('btn_back', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:home' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,
@@ -824,7 +844,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     );
   }
 
-  private async sendModelsMenu(page = 0): Promise<void> {
+  public async sendModelsMenu(page = 0): Promise<void> {
     const favs = this.cfgManager.config.favoriteModels || [];
     let allModels: string[] = [];
     if (typeof this.engine.listModels === 'function') {
@@ -844,22 +864,20 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       },
     ]);
 
-    const navRow: InlineKeyboardButton[] = [];
     if (page === 0) {
-      navRow.push({ text: t('btn_back', this.language), callback_data: 'hp' });
       if (rest.length > 0) {
-        navRow.push({ text: t('btn_all_models', this.language), callback_data: 'pg:1' });
+        rows.push([{ text: t('btn_all_models', this.language), callback_data: 'pg:1' }]);
       }
+      rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:home' }]);
     } else {
-      navRow.push({ text: t('btn_favorites', this.language), callback_data: 'pg:0' });
+      const pagRow: InlineKeyboardButton[] = [
+        { text: t('btn_favorites', this.language), callback_data: 'pg:0' },
+      ];
       if (rest.length > page * 10) {
-        navRow.push({ text: t('btn_next', this.language), callback_data: `pg:${page + 1}` });
+        pagRow.push({ text: t('btn_next', this.language), callback_data: `pg:${page + 1}` });
       }
-      navRow.push({ text: t('btn_back', this.language), callback_data: 'hp' });
-    }
-
-    if (navRow.length > 0) {
-      rows.push(navRow);
+      rows.push(pagRow);
+      rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:md' }]);
     }
 
     await this.channel.sendMessage(
@@ -878,7 +896,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
         { text: `${this.currentMode === 'auto' ? '● ' : ''}⚡ Auto Mode`, callback_data: 'mo:auto' },
       ],
       [
-        { text: t('btn_back', this.language), callback_data: 'hp' },
+        { text: t('btn_back', this.language), callback_data: 'menu:home' },
       ],
     ];
 
@@ -899,7 +917,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
         callback_data: `se:${this.activeRun.sessionId}`,
       }]);
     }
-    rows.push([{ text: t('btn_back', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:home' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,
@@ -963,7 +981,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     const rows: InlineKeyboardButton[][] = skillsList.map((sk) => [
       { text: `🧰 ${sk}`, callback_data: `sk:${sk}` },
     ]);
-    rows.push([{ text: t('btn_back', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:home' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,
@@ -992,7 +1010,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     const rows: InlineKeyboardButton[][] = [
       [{ text: `${cur === 'en' ? '● ' : ''}🇺🇸 English`, callback_data: 'lang:en' }],
       [{ text: `${cur === 'ar' ? '● ' : ''}🇸🇦 العربية`, callback_data: 'lang:ar' }],
-      [{ text: t('btn_back', this.language), callback_data: 'hp' }],
+      [{ text: t('btn_back', this.language), callback_data: 'menu:home' }],
     ];
 
     await this.channel.sendMessage(
@@ -1043,7 +1061,7 @@ Agent: <b>${escapeHtml(this.currentAgent)}</b> | Mode: <b>${escapeHtml(this.curr
         callback_data: `ws:${i}`,
       },
     ]);
-    rows.push([{ text: t('btn_back', this.language), callback_data: 'hp' }]);
+    rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:home' }]);
 
     await this.channel.sendMessage(
       this.allowedChatId,

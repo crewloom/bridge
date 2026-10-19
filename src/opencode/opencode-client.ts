@@ -250,34 +250,39 @@ export class OpenCodeClient extends EventEmitter {
 
     const proc = child_process.spawn(
       'opencode',
-      ['serve', '--port', String(actualPort), '--hostname', '127.0.0.1'],
+      ['serve', '--port', String(actualPort), '--hostname', '127.0.0.1', '--pure'],
       {
         cwd: targetDir,
         env: {
           ...process.env,
           OPENCODE_SERVER_PASSWORD: password,
         },
-        stdio: ['ignore', 'pipe', 'pipe'],
+        stdio: ['ignore', 'ignore', 'ignore'],
       }
     );
 
     const client = new OpenCodeClient(`http://127.0.0.1:${actualPort}`, password, targetDir);
 
-    // Wait until server is accepting connections (up to 15s)
+    // Wait until server is accepting connections (up to 60s for low-memory VPS)
     let ready = false;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < 60; i++) {
+      if (proc.exitCode !== null) {
+        throw new Error(`OpenCode process exited early with code ${proc.exitCode}`);
+      }
       try {
         await client.request('GET', '/global/health');
         ready = true;
         break;
       } catch {
-        await new Promise((r) => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 1000));
       }
     }
 
     if (!ready) {
-      proc.kill();
-      throw new Error(`OpenCode server failed to start on port ${actualPort}`);
+      try {
+        proc.kill('SIGTERM');
+      } catch {}
+      throw new Error(`OpenCode server failed to start on port ${actualPort} within 60s`);
     }
 
     client.serverProcess = proc;

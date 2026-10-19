@@ -73,7 +73,7 @@ export const TRANSLATIONS = {
     btn_help: '❓ مساعدة',
     btn_language: '🌐 اللغة',
     btn_back: '⬅️ رجوع',
-    btn_all_models: '➡️ جميع النماذج',
+    btn_all_models: '➡️ المزيد',
     btn_favorites: '⭐ المفضلة',
     btn_next: '➡️ التالي',
 

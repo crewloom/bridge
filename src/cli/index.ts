@@ -21,7 +21,7 @@ import { EngineRegistry } from '../engines/registry.js';
 import type { IAgentEngine } from '../engines/engine.interface.js';
 import { ServiceManager, getEntryPoint } from '../service/service-manager.js';
 
-export const VERSION = '2.0.2';
+export const VERSION = '2.0.3';
 
 // ANSI Styling Tokens
 export const C = {
@@ -376,15 +376,22 @@ export async function cmdStart(args: string[]): Promise<void> {
   let spawnedOc: { client: OpenCodeClient; port: number } | undefined;
 
   if (selectedEngine === 'opencode') {
-    try {
-      info('Spawning private OpenCode server on loopback...');
-      spawnedOc = await OpenCodeClient.spawnServer(targetDir);
-      engineAdapter = new OpenCodeAdapter(spawnedOc.client, targetDir);
-      success(`OpenCode server online (port: ${spawnedOc.port}).`);
-    } catch (err) {
-      error(`Could not spawn OpenCode server: ${(err as Error).message}`);
-      log(`Make sure OpenCode is installed: ${C.cyan}npm i -g opencode-ai${C.reset}`);
-      process.exit(1);
+    const envUrl = process.env.OPENCODE_URL;
+    if (envUrl) {
+      info(`Connecting to configured OpenCode server at: ${C.cyan}${envUrl}${C.reset}`);
+      const ocClient = new OpenCodeClient(envUrl, process.env.OPENCODE_SERVER_PASSWORD, targetDir);
+      engineAdapter = new OpenCodeAdapter(ocClient, targetDir);
+    } else {
+      try {
+        info('Spawning private OpenCode server on loopback...');
+        spawnedOc = await OpenCodeClient.spawnServer(targetDir);
+        engineAdapter = new OpenCodeAdapter(spawnedOc.client, targetDir);
+        success(`OpenCode server online (port: ${spawnedOc.port}).`);
+      } catch (err) {
+        warn(`Could not spawn OpenCode server: ${(err as Error).message}`);
+        warn('Resilience mode active: Falling back to Shell CLI Engine so Telegram bot connects immediately.');
+        engineAdapter = new ShellEngineAdapter({ workspaceDir: targetDir, cliCommand: 'sh' });
+      }
     }
   } else if (selectedEngine === 'shell' || selectedEngine === 'sh' || selectedEngine === 'bash') {
     engineAdapter = new ShellEngineAdapter({ workspaceDir: targetDir, cliCommand: 'sh' });
