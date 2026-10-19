@@ -160,4 +160,12 @@ export class TelegramChannelAdapter implements IChannelAdapter {
   public async answerAction(actionId: string, text?: string): Promise<void> {
     await this.client.answerCallbackQuery(actionId, text);
   }
+
+  public async sendChatAction(recipientId: string, action = 'typing'): Promise<void> {
+    await this.client.sendChatAction(recipientId, action as any);
+  }
+
+  public async registerCommands(commands: Array<{ command: string; description: string }>): Promise<void> {
+    await this.client.setMyCommands(commands);
+  }
 }

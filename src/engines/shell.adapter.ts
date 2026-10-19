@@ -4,6 +4,8 @@
  * Pure Node.js with zero runtime dependencies.
  */
 import * as child_process from 'node:child_process';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { EventEmitter } from 'node:events';
 import type {
   IAgentEngine,
@@ -72,25 +74,59 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
 
     let command = this.cliCommand;
     let args = [...this.defaultArgs];
+    let resolvedPrompt = prompt.trim();
+
+    // 1. Resolve well-known skill scripts if running via sh/bash
+    if (this.cliCommand === 'sh' || this.cliCommand === 'bash') {
+      const lower = resolvedPrompt.toLowerCase();
+      if (lower.startsWith('/pinpoint_go') || lower.startsWith('/pinpoint-go') || lower === 'pinpoint_go' || lower === 'pinpoint-go') {
+        const script = path.join(this.workspaceDir, 'tools', 'ai', 'pinpoint_go.sh');
+        if (fs.existsSync(script)) {
+          const extra = resolvedPrompt.replace(/^\/?pinpoint[-_]go\s*/i, '');
+          resolvedPrompt = `bash tools/ai/pinpoint_go.sh ${extra}`.trim();
+        }
+      } else if (lower.startsWith('/query_perf') || lower.startsWith('/query-perf') || lower === 'query_perf' || lower === 'query-perf') {
+        const script = path.join(this.workspaceDir, 'tools', 'ai', 'query_perf_audit.py');
+        if (fs.existsSync(script)) {
+          resolvedPrompt = `python3 tools/ai/query_perf_audit.py --all --summary`;
+        }
+      } else if (lower.startsWith('/verify_erp') || lower.startsWith('/verify-erp') || lower === 'verify_erp' || lower === 'verify-erp') {
+        const script = path.join(this.workspaceDir, 'tools', 'ai', 'verify_erp_change.py');
+        if (fs.existsSync(script)) {
+          resolvedPrompt = `python3 tools/ai/verify_erp_change.py --check-docs`;
+        }
+      } else if (lower.startsWith('/validate_skills') || lower === 'validate_skills') {
+        const script = path.join(this.workspaceDir, 'tools', 'ai', 'validate_skills.py');
+        if (fs.existsSync(script)) {
+          resolvedPrompt = `python3 tools/ai/validate_skills.py`;
+        }
+      } else if (lower.startsWith('/test_gates') || lower === 'test_gates') {
+        const script = path.join(this.workspaceDir, 'tools', 'ai', 'test_gates.py');
+        if (fs.existsSync(script)) {
+          resolvedPrompt = `python3 tools/ai/test_gates.py`;
+        }
+      }
+    }
 
     if (this.cliCommand === 'claude') {
-      args.push('-p', prompt);
+      args.push('-p', resolvedPrompt);
     } else if (this.cliCommand === 'aider') {
-      args.push('--message', prompt, '--yes');
+      args.push('--message', resolvedPrompt, '--yes');
     } else if (this.cliCommand === 'sh' || this.cliCommand === 'bash') {
-      args = ['-c', prompt];
+      args = ['-c', resolvedPrompt];
     } else {
-      args.push(prompt);
+      args.push(resolvedPrompt);
     }
 
     const toolId = `tool-${Date.now()}`;
+    const cmdPreview = `${command} ${args.join(' ')}`;
     this.emit('event', {
       type: 'tool.execute',
       properties: {
         id: toolId,
         tool: this.cliCommand,
-        title: `Running: ${prompt.slice(0, 60)}`,
-        metadata: { command: `${command} ${args.join(' ')}` },
+        title: `Running: ${resolvedPrompt.slice(0, 80)}`,
+        metadata: { command: cmdPreview },
       },
     } as AgentEngineEvent);
 
@@ -108,11 +144,31 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
         let stderr = '';
 
         proc.stdout?.on('data', (data) => {
-          stdout += data.toString();
+          const chunk = data.toString();
+          stdout += chunk;
+          this.emit('event', {
+            type: 'tool.output',
+            properties: {
+              id: toolId,
+              stream: 'stdout',
+              chunk,
+              tail: stdout.slice(-800),
+            },
+          } as AgentEngineEvent);
         });
 
         proc.stderr?.on('data', (data) => {
-          stderr += data.toString();
+          const chunk = data.toString();
+          stderr += chunk;
+          this.emit('event', {
+            type: 'tool.output',
+            properties: {
+              id: toolId,
+              stream: 'stderr',
+              chunk,
+              tail: stderr.slice(-800),
+            },
+          } as AgentEngineEvent);
         });
 
         proc.on('error', (err) => {
@@ -135,8 +191,9 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
             properties: {
               id: toolId,
               status: code === 0 ? 'done' : 'error',
-              output: stdout.slice(-2000),
-              error: code === 0 ? undefined : stderr.slice(-1000),
+              code,
+              output: stdout.slice(-3000),
+              error: code === 0 ? undefined : (stderr || stdout).slice(-1500),
             },
           } as AgentEngineEvent);
           resolve();

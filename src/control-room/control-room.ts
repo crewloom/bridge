@@ -213,6 +213,10 @@ export class ControlRoom {
 
     if (this.allowedChatId && this.allowedChatId.trim()) {
       try {
+        await this.registerDefaultCommands();
+      } catch {}
+
+      try {
         await this.channel.sendMessage(
           this.allowedChatId,
           t('welcome', this.language, { target: escapeHtml(this.targetDir) }),
@@ -340,6 +344,66 @@ export class ControlRoom {
         replyMarkup: this.getMainKeyboard(),
       });
       return;
+    }
+
+    // Resolve Skill and Tool Slash Commands (e.g. /pinpoint_go, /query_perf, /frontend)
+    if (text.startsWith('/') || text.startsWith('@')) {
+      const parts = text.slice(1).trim().split(/\s+/);
+      const rawCmd = (parts[0] || '').toLowerCase();
+      const rest = parts.slice(1).join(' ').trim();
+      const cleanCmd = rawCmd.replace(/[-@]/g, '_');
+
+      if (cleanCmd === 'pinpoint_go') {
+        const script = path.join(this.targetDir, 'tools', 'ai', 'pinpoint_go.sh');
+        const runCmd = fs.existsSync(script)
+          ? `bash tools/ai/pinpoint_go.sh ${rest}`.trim()
+          : `tools/ai/pinpoint_go.sh ${rest}`.trim();
+        await this.guardedSubmit(runCmd, msg.id);
+        return;
+      }
+
+      if (cleanCmd === 'query_perf' || cleanCmd === 'query_performance') {
+        await this.guardedSubmit(`python3 tools/ai/query_perf_audit.py --all --summary`, msg.id);
+        return;
+      }
+
+      if (cleanCmd === 'verify_erp' || cleanCmd === 'erp_verify') {
+        await this.guardedSubmit(`python3 tools/ai/verify_erp_change.py --check-docs`, msg.id);
+        return;
+      }
+
+      if (cleanCmd === 'validate_skills') {
+        await this.guardedSubmit(`python3 tools/ai/validate_skills.py`, msg.id);
+        return;
+      }
+
+      if (cleanCmd === 'test_gates') {
+        await this.guardedSubmit(`python3 tools/ai/test_gates.py`, msg.id);
+        return;
+      }
+
+      const allSkills = this.getAllAvailableSkills();
+      const matchedSkill = allSkills.find((s) => {
+        const sClean = s.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+        return s.name.toLowerCase() === rawCmd || sClean === cleanCmd || cleanCmd.endsWith(sClean);
+      });
+
+      if (matchedSkill) {
+        if (rest) {
+          this.activeSkill = matchedSkill.name;
+          await this.guardedSubmit(rest, msg.id);
+          return;
+        } else {
+          this.activeSkill = matchedSkill.name;
+          const desc = matchedSkill.description ? `\n<i>${escapeHtml(matchedSkill.description)}</i>` : '';
+          await this.channel.sendMessage(
+            this.allowedChatId,
+            `🧰 Skill <b>${escapeHtml(matchedSkill.name)}</b> is now ACTIVE! 🎯${desc}\n\n<i>Send your instructions or coding task now to execute with this skill.</i>`,
+            { replyMarkup: this.getMainKeyboard() }
+          );
+          return;
+        }
+      }
     }
 
     // Submit Task Prompt
@@ -704,11 +768,12 @@ export class ControlRoom {
       return;
     }
 
-    // Step finish / complete
-    if (type === 'step_finish' || type === 'run.finish') {
-      this.activeRun.busy = false;
-      this.activeRun.done = true;
-      await this.updateMissionCard(true);
+    // Tool output streaming (stdout / stderr)
+    if (type === 'tool.output') {
+      const tail = String(props.tail || props.chunk || '');
+      if (tail) {
+        this.activeRun.recentOutput = tail;
+      }
       return;
     }
 
@@ -716,6 +781,11 @@ export class ControlRoom {
     if (type === 'tool.execute' || type === 'tool_call') {
       this.activeRun.cmds++;
       const toolId = String(props.id || Math.random());
+      const meta = (props.metadata || {}) as Record<string, unknown>;
+      const cmd = String(meta.command || props.title || '');
+      if (cmd) {
+        this.activeRun.currentCommand = cmd;
+      }
       this.activeRun.tools[toolId] = {
         id: toolId,
         tool: String(props.tool || 'bash'),
@@ -725,12 +795,45 @@ export class ControlRoom {
       if (!this.activeRun.toolOrder.includes(toolId)) {
         this.activeRun.toolOrder.push(toolId);
       }
+      return;
+    }
+
+    // Step finish / complete
+    if (type === 'step_finish' || type === 'run.finish') {
+      this.activeRun.busy = false;
+      this.activeRun.done = true;
+      if (props.output) {
+        this.activeRun.lastResultOutput = String(props.output);
+      }
+      if (props.error) {
+        this.activeRun.error = String(props.error);
+      }
+      await this.updateMissionCard(true);
+
+      const rawOutput = String(props.output || props.error || this.activeRun.recentOutput || '').trim();
+      if (rawOutput) {
+        const isErr = props.status === 'error' || Boolean(props.error);
+        const codeSuffix = props.code !== undefined ? ` (Exit: ${props.code})` : '';
+        const header = isErr
+          ? `❌ <b>Execution Failed${codeSuffix}</b>`
+          : `✅ <b>Execution Finished</b>`;
+        const snippet = rawOutput.length > 3500 ? rawOutput.slice(-3500) : rawOutput;
+        await this.channel.sendMessage(
+          this.allowedChatId,
+          `${header}\n<pre><code>${escapeHtml(snippet)}</code></pre>`,
+          { replyMarkup: this.getMainKeyboard() }
+        );
+      }
+      return;
     }
   }
 
   private startMissionCardTicker(): void {
     if (this.updateTimer) clearInterval(this.updateTimer);
     this.updateTimer = setInterval(() => {
+      if (this.activeRun && this.activeRun.busy) {
+        this.channel.sendChatAction?.(this.allowedChatId, 'typing').catch(() => {});
+      }
       this.updateMissionCard(false).catch(() => {});
     }, 2500);
   }
@@ -743,7 +846,7 @@ export class ControlRoom {
     const statusIcon = run.done ? '🏁' : run.busy ? '🟢' : '⏸';
     const statusText = run.done ? 'Finished' : run.busy ? 'Executing' : 'Waiting';
 
-    return `
+    let card = `
 ⚡ <b>AgentGram · Live Mission Control</b>
 Agent: 🧠 <code>${escapeHtml(run.agent)}</code> (${escapeHtml(this.engine.name)}) | Mode: 🔒 <b>${run.mode}</b>
 Channel: 📡 <b>${escapeHtml(this.channel.name)}</b>
@@ -751,6 +854,16 @@ Status: ${statusIcon} <b>${statusText}</b> · ⏳ ${elapsed}s
 Commands: ⚙️ ${run.cmds} · Files: 📝 ${run.files.size}
 Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
 `.trim();
+
+    if (run.currentCommand && run.busy) {
+      card += `\n\n⚙️ <b>Active Action:</b>\n<code>${escapeHtml(run.currentCommand.slice(0, 120))}</code>`;
+    }
+
+    if (run.recentOutput && run.busy) {
+      card += `\n\n📋 <b>Live Stream:</b>\n<pre><code>${escapeHtml(run.recentOutput.slice(-300))}</code></pre>`;
+    }
+
+    return card;
   }
 
   private async updateMissionCard(final = false): Promise<void> {
@@ -1056,6 +1169,48 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     }
 
     return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  public async registerDefaultCommands(): Promise<void> {
+    if (!this.channel.registerCommands) return;
+    const allSkills = this.getAllAvailableSkills();
+    const standardCommands: Array<{ command: string; description: string }> = [
+      { command: 'pinpoint_go', description: '🚀 Run Pinpoint Ops test, commit, deploy & report' },
+      { command: 'skills', description: '🧰 Browse all 58 agent skills with pagination' },
+      { command: 'models', description: '🤖 AI models & context window inspection' },
+      { command: 'status', description: '📊 Mission control status & active workspace' },
+      { command: 'diff', description: '📝 View pending git diff changes' },
+      { command: 'new', description: '✨ Start fresh mission session' },
+      { command: 'stop', description: '⏹️ Abort currently running task' },
+      { command: 'frontend', description: '🎨 Vue 3 / Inertia / Admin-Vue design laws' },
+      { command: 'erp_debug', description: '💼 ERP double-entry & ledger diagnostics' },
+      { command: 'financial_expert', description: '💰 CFO accounting, treasury & close' },
+      { command: 'query_performance', description: '⚡ SQL query performance & index audit' },
+      { command: 'security_audit', description: '🛡️ Security & permissions inspection' },
+      { command: 'git_hygiene', description: '🌿 Branch safety & exact staging' },
+      { command: 'code_health', description: '🩺 Speed, memory, queues & runtime health' },
+      { command: 'tracking_lifecycle', description: '📍 Location tracking & Go WebSocket' },
+      { command: 'help', description: '⚡ Commands and operational help' },
+    ];
+
+    const known = new Set(standardCommands.map((c) => c.command));
+    for (const sk of allSkills) {
+      if (standardCommands.length >= 80) break;
+      const cmdName = sk.name.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase().slice(0, 32);
+      if (!known.has(cmdName) && cmdName.length > 0) {
+        known.add(cmdName);
+        standardCommands.push({
+          command: cmdName,
+          description: sk.description ? sk.description.slice(0, 100) : `🧰 Run ${sk.name} skill`,
+        });
+      }
+    }
+
+    try {
+      await this.channel.registerCommands(standardCommands);
+    } catch (err) {
+      console.warn('Failed to register bot commands with channel:', (err as Error).message);
+    }
   }
 
   public async sendSkillsMenu(page = 0): Promise<void> {

@@ -144,6 +144,9 @@ export interface OpenCodeRun {
   busy: boolean;
   done: boolean;
   error?: string | null | undefined;
+  currentCommand?: string | undefined;
+  recentOutput?: string | undefined;
+  lastResultOutput?: string | undefined;
 }
 
 export interface OpenCodePermissionRequest {

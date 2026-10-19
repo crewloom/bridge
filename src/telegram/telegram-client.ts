@@ -215,4 +215,28 @@ export class TelegramClient {
   public async getMe(): Promise<{ id: number; username?: string; first_name: string }> {
     return await this.callApi<{ id: number; username?: string; first_name: string }>('getMe');
   }
+
+  public async setMyCommands(
+    commands: Array<{ command: string; description: string }>
+  ): Promise<boolean> {
+    try {
+      return await this.callApi<boolean>('setMyCommands', { commands });
+    } catch {
+      return false;
+    }
+  }
+
+  public async sendChatAction(
+    chatId: string | number,
+    action: 'typing' | 'upload_document' | 'record_video' | 'choose_sticker' = 'typing'
+  ): Promise<boolean> {
+    try {
+      return await this.callApi<boolean>('sendChatAction', {
+        chat_id: chatId,
+        action,
+      });
+    } catch {
+      return false;
+    }
+  }
 }

@@ -89,4 +89,14 @@ export interface IChannelAdapter {
    * Acknowledge or answer an interactive action / callback.
    */
   answerAction(actionId: string, text?: string): Promise<void>;
+
+  /**
+   * Optional: Send a typing or processing indicator.
+   */
+  sendChatAction?(recipientId: string, action?: string): Promise<void>;
+
+  /**
+   * Optional: Register slash commands for native autocomplete in channel client.
+   */
+  registerCommands?(commands: Array<{ command: string; description: string }>): Promise<void>;
 }

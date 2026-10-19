@@ -49,6 +49,17 @@ class MockChannelAdapter implements IChannelAdapter {
   public async answerAction(actionId: string, _text?: string): Promise<void> {
     this.answeredActions.push(actionId);
   }
+
+  public registeredCommands: Array<{ command: string; description: string }> = [];
+  public chatActions: string[] = [];
+
+  public async registerCommands(commands: Array<{ command: string; description: string }>): Promise<void> {
+    this.registeredCommands = commands;
+  }
+
+  public async sendChatAction(_recipientId: string, action?: string): Promise<void> {
+    this.chatActions.push(action || 'typing');
+  }
 }
 
 class MockAgentEngine extends EventEmitter implements IAgentEngine {
@@ -342,6 +353,106 @@ test('ControlRoom - sendSkillsMenu discovers skills and supports pagination', as
   // Must have back button routing to menu:home
   const backBtn = rows.flat().find((b) => b.callbackData === 'menu:home');
   assert.ok(backBtn, 'Must have Back button');
+
+  room.stop();
+});
+
+test('ControlRoom - registerDefaultCommands registers skills and slash commands with channel', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  await room.registerDefaultCommands();
+
+  assert.ok(mockChan.registeredCommands.length > 0, 'Must register commands');
+  const pinpointCmd = mockChan.registeredCommands.find((c) => c.command === 'pinpoint_go');
+  assert.ok(pinpointCmd, 'Must include pinpoint_go command');
+  const skillsCmd = mockChan.registeredCommands.find((c) => c.command === 'skills');
+  assert.ok(skillsCmd, 'Must include skills command');
+
+  room.stop();
+});
+
+test('ControlRoom - handleUserMessage resolves skill slash commands and executes', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  // Sending /frontend without args activates skill and invites prompt
+  await (room as any).handleUserMessage({
+    id: 1,
+    chatId: '123456789',
+    senderId: '123456789',
+    text: '/frontend',
+    timestamp: Date.now(),
+  });
+
+  const lastMsg = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(lastMsg.text.includes('ACTIVE') || lastMsg.text.includes('Skill'), 'Must announce active skill');
+  assert.equal((room as any).activeSkill, 'frontend');
+
+  room.stop();
+});
+
+test('ControlRoom - handleEngineEvent handles live output and sends terminal result card on step_finish', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  // Submit task to create active run
+  await room.guardedSubmit('echo test');
+  assert.ok((room as any).activeRun);
+
+  // Emit live tool output
+  mockEng.emit('event', {
+    type: 'tool.output',
+    properties: {
+      id: 'tool-1',
+      stream: 'stdout',
+      chunk: 'Deploying Pinpoint Ops...',
+      tail: 'Deploying Pinpoint Ops...',
+    },
+  });
+
+  assert.equal((room as any).activeRun.recentOutput, 'Deploying Pinpoint Ops...');
+
+  // Emit step_finish
+  mockEng.emit('event', {
+    type: 'step_finish',
+    properties: {
+      id: 'tool-1',
+      status: 'done',
+      output: 'All tests green. Deployed successfully.',
+    },
+  });
+
+  await new Promise((r) => setTimeout(r, 25));
+
+  // Check that final output message was sent
+  const resultMsg = mockChan.sentMessages.find((m) => m.text.includes('Execution Finished'));
+  assert.ok(resultMsg, 'Must send final execution result message');
+  assert.ok(resultMsg.text.includes('All tests green'));
 
   room.stop();
 });
