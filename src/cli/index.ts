@@ -21,7 +21,7 @@ import { EngineRegistry } from '../engines/registry.js';
 import type { IAgentEngine } from '../engines/engine.interface.js';
 import { ServiceManager, getEntryPoint } from '../service/service-manager.js';
 
-export const VERSION = '2.0.8';
+export const VERSION = '2.0.9';
 
 // ANSI Styling Tokens
 export const C = {

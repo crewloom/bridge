@@ -364,7 +364,7 @@ export class ControlRoom {
     if (text === '/start' || text === '/help' || text === '@help') {
       await this.channel.sendMessage(
         this.allowedChatId,
-        `⚡ <b>AgentGram v2.0.8 · Mission Control</b>\n${t('help_title', this.language)}`,
+        `⚡ <b>AgentGram v2.0.9 · Mission Control</b>\n${t('help_title', this.language)}`,
         { replyMarkup: this.getMainKeyboard() }
       );
       return;
@@ -1418,12 +1418,12 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     const allSkills = this.getAllAvailableSkills();
     const standardCommands: Array<{ command: string; description: string }> = [
       { command: 'pinpoint_go', description: '🚀 Run Pinpoint Ops test, commit, deploy & report' },
-      { command: 'skills', description: '🧰 Browse all 58 agent skills with pagination' },
-      { command: 'models', description: '🤖 AI models & context window inspection' },
-      { command: 'status', description: '📊 Mission control status & active workspace' },
-      { command: 'diff', description: '📝 View pending git diff changes' },
-      { command: 'new', description: '✨ Start fresh mission session' },
-      { command: 'stop', description: '⏹️ Abort currently running task' },
+      { command: 'plan', description: '📐 Architecture, planning & design agent' },
+      { command: 'build', description: '🤖 Primary autonomous code builder agent' },
+      { command: 'review', description: '🔍 Code review & security gate agent' },
+      { command: 'claude', description: '🧠 Switch to Claude 3.5 Sonnet' },
+      { command: 'gemini', description: '🧠 Switch to Gemini 2.0 Flash' },
+      { command: 'mentions', description: '⚡ Mentions & Instant Shortcuts Hub (@)' },
       { command: 'frontend', description: '🎨 Vue 3 / Inertia / Admin-Vue design laws' },
       { command: 'erp_debug', description: '💼 ERP double-entry & ledger diagnostics' },
       { command: 'financial_expert', description: '💰 CFO accounting, treasury & close' },
@@ -1431,7 +1431,12 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       { command: 'security_audit', description: '🛡️ Security & permissions inspection' },
       { command: 'git_hygiene', description: '🌿 Branch safety & exact staging' },
       { command: 'code_health', description: '🩺 Speed, memory, queues & runtime health' },
-      { command: 'tracking_lifecycle', description: '📍 Location tracking & Go WebSocket' },
+      { command: 'status', description: '📊 Mission control status & active workspace' },
+      { command: 'diff', description: '📝 View pending git diff changes' },
+      { command: 'new', description: '✨ Start fresh mission session' },
+      { command: 'stop', description: '⏹️ Abort currently running task' },
+      { command: 'skills', description: '🧰 Browse all 58 agent skills with pagination' },
+      { command: 'models', description: '🤖 AI models & context window inspection' },
       { command: 'help', description: '⚡ Commands and operational help' },
     ];
 
@@ -1603,29 +1608,22 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
 
     const results: TelegramInlineQueryResultArticle[] = [];
 
-    // 1. Matched / Top Skills
-    for (const sk of allSkills) {
-      const skClean = sk.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
-      if (
-        !query ||
-        sk.name.toLowerCase().includes(query) ||
-        skClean.includes(query) ||
-        (sk.description && sk.description.toLowerCase().includes(query))
-      ) {
+    // 1. Core Agents first
+    for (const ag of agents) {
+      if (!query || ag.includes(query)) {
         results.push({
           type: 'article',
-          id: `sk_${skClean}`,
-          title: `🧰 @${sk.name}`,
-          description: sk.description ? sk.description.slice(0, 80) : `Run ${sk.name} skill`,
+          id: `ag_${ag}`,
+          title: `🤖 @${ag}`,
+          description: `Switch active agent to ${ag} mode`,
           input_message_content: {
-            message_text: `/${skClean}`,
+            message_text: `@${ag}`,
           },
         });
-        if (results.length >= 25) break;
       }
     }
 
-    // 2. Matched / Top Models
+    // 2. Starred Models
     for (const mId of allModels) {
       const meta = resolveModelMetadata(mId);
       if (
@@ -1643,22 +1641,29 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
             message_text: `@${mId}`,
           },
         });
-        if (results.length >= 40) break;
+        if (results.length >= 15) break;
       }
     }
 
-    // 3. Matched Agents
-    for (const ag of agents) {
-      if (!query || ag.includes(query)) {
+    // 3. Governed Skills
+    for (const sk of allSkills) {
+      const skClean = sk.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
+      if (
+        !query ||
+        sk.name.toLowerCase().includes(query) ||
+        skClean.includes(query) ||
+        (sk.description && sk.description.toLowerCase().includes(query))
+      ) {
         results.push({
           type: 'article',
-          id: `ag_${ag}`,
-          title: `🤖 @${ag}`,
-          description: `Switch active agent to ${ag}`,
+          id: `sk_${skClean}`,
+          title: `🧰 @${sk.name}`,
+          description: sk.description ? sk.description.slice(0, 80) : `Run ${sk.name} skill`,
           input_message_content: {
-            message_text: `@${ag}`,
+            message_text: `/${skClean}`,
           },
         });
+        if (results.length >= 50) break;
       }
     }
 
