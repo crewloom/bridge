@@ -364,7 +364,7 @@ export class ControlRoom {
     if (text === '/start' || text === '/help' || text === '@help') {
       await this.channel.sendMessage(
         this.allowedChatId,
-        `⚡ <b>AgentGram v2.0.0 · Mission Control</b>\n${t('help_title', this.language)}`,
+        `⚡ <b>AgentGram v2.0.8 · Mission Control</b>\n${t('help_title', this.language)}`,
         { replyMarkup: this.getMainKeyboard() }
       );
       return;
