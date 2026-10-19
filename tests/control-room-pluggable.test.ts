@@ -456,3 +456,44 @@ test('ControlRoom - handleEngineEvent handles live output and sends terminal res
 
   room.stop();
 });
+
+test('ControlRoom - responds to conversational presence inquiries like "هل انت شغال ؟"', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  await (room as any).handleUserMessage({
+    id: 101,
+    chatId: '123456789',
+    senderId: '123456789',
+    text: 'هل انت شغال ؟',
+    timestamp: Date.now(),
+  });
+
+  const lastMsg = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(lastMsg, 'Must reply to presence query');
+  assert.ok(lastMsg.text.includes('نعم، أنا أعمل حياً ومتصل بالسيرفر'), 'Must reply with affirmative presence status');
+  assert.ok(lastMsg.text.includes('فرع Git:'), 'Must show Git branch');
+  assert.ok(lastMsg.text.includes('الموديل:'), 'Must show active model');
+
+  // Also test who are you
+  await (room as any).handleUserMessage({
+    id: 102,
+    chatId: '123456789',
+    senderId: '123456789',
+    text: 'مين انت',
+    timestamp: Date.now(),
+  });
+
+  const lastMsg2 = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(lastMsg2.text.includes('AgentGram'), 'Must introduce AgentGram');
+
+  room.stop();
+});

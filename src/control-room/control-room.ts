@@ -260,6 +260,92 @@ export class ControlRoom {
     const text = (msg.text || '').trim();
     if (!text) return;
 
+    // 0. Conversational Presence & Status Inquiries (e.g. هل انت شغال ؟, are you working?)
+    const norm = text.toLowerCase().replace(/[؟?!.,]/g, '').trim();
+    if (
+      norm === 'هل انت شغال' ||
+      norm === 'هل أنت شغال' ||
+      norm === 'انت شغال' ||
+      norm === 'أنت شغال' ||
+      norm === 'شغال' ||
+      norm === 'are you working' ||
+      norm === 'are you online' ||
+      norm === 'are you there' ||
+      norm === 'ping'
+    ) {
+      let branch = 'unknown';
+      try {
+        const b = child_process.spawnSync('git', ['branch', '--show-current'], {
+          cwd: this.targetDir,
+          encoding: 'utf-8',
+          timeout: 4000,
+        });
+        if (b.status === 0) branch = b.stdout.trim() || 'main';
+      } catch {}
+
+      const curMeta = resolveModelMetadata(this.currentModel);
+      const isAr = this.language === 'ar' || /[\u0600-\u06FF]/.test(text);
+
+      const statusCard = isAr
+        ? `🟢 <b>أهلاً بك! نعم، أنا أعمل حياً ومتصل بالسيرفر بنجاح!</b> ⚡\n\n` +
+          `📁 <b>المشروع:</b> <code>${escapeHtml(path.basename(this.targetDir))}</code>\n` +
+          `🌿 <b>فرع Git:</b> <code>${escapeHtml(branch)}</code>\n` +
+          `🧠 <b>الموديل:</b> <code>${escapeHtml(curMeta.name)}</code> (سياق: <code>${escapeHtml(curMeta.contextWindow)}</code>)\n` +
+          `🧰 <b>المهارة النشطة:</b> <code>${escapeHtml(this.activeSkill || 'عامة')}</code>\n` +
+          `💻 <b>بيئة العمل:</b> Linux VPS (141.253.114.101)\n\n` +
+          `<b>جاهز لتنفيذ طلباتك:</b>\n` +
+          `• اضغط <b>/</b> لاختيار المهارات السريعة (مثل <code>/pinpoint_go</code> أو <code>/frontend</code>).\n` +
+          `• اكتب أي أمر طرفية مباشر (مثل <code>git status</code> أو <code>free -m</code>).\n` +
+          `• استخدم الأزرار أدناه للتحكم الشامل.`
+        : `🟢 <b>Yes, I am online, active, and fully connected to the server!</b> ⚡\n\n` +
+          `📁 <b>Workspace:</b> <code>${escapeHtml(path.basename(this.targetDir))}</code>\n` +
+          `🌿 <b>Git Branch:</b> <code>${escapeHtml(branch)}</code>\n` +
+          `🧠 <b>Active Model:</b> <code>${escapeHtml(curMeta.name)}</code> (${escapeHtml(curMeta.contextWindow)})\n` +
+          `🧰 <b>Active Skill:</b> <code>${escapeHtml(this.activeSkill || 'General')}</code>\n` +
+          `💻 <b>Environment:</b> Linux VPS (141.253.114.101)\n\n` +
+          `<b>Ready to assist:</b>\n` +
+          `• Type <b>/</b> to autocomplete skills (like <code>/pinpoint_go</code> or <code>/frontend</code>).\n` +
+          `• Enter direct shell commands (e.g. <code>git status</code> or <code>free -m</code>).\n` +
+          `• Use the mission control buttons below.`;
+
+      await this.channel.sendMessage(this.allowedChatId, statusCard, {
+        replyToMessageId: msg.id,
+        replyMarkup: this.getMainKeyboard(),
+      });
+      return;
+    }
+
+    if (
+      norm === 'من انت' ||
+      norm === 'مين انت' ||
+      norm === 'ماذا تفعل' ||
+      norm === 'who are you' ||
+      norm === 'what do you do'
+    ) {
+      const isAr = this.language === 'ar' || /[\u0600-\u06FF]/.test(text);
+      const intro = isAr
+        ? `⚡ <b>أنا AgentGram — غرفة التحكم والعمليات المباشرة لـ Rveta!</b> 🚀\n\n` +
+          `أعمل كحلقة وصل تفاعلية حية بينك وبين السيرفر عبر تليجرام، مع دعم كامل لـ:\n` +
+          `• تنفيذ المهارات الـ 58 وحوكمة الأكواد والتصميم\n` +
+          `• تشغيل ومراقبة نشر Pinpoint Ops حياً عبر السيرفر (<code>/pinpoint_go</code>)\n` +
+          `• تشغيل أوامر السيرفر وعرض مخرجات الـ Terminal بثاً حياً\n` +
+          `• حماية السيرفر من أي أوامر مدمرة أو ثغرات أمنية\n\n` +
+          `<i>اضغط على <b>/</b> لبدء تجربة المهارات فوراً.</i>`
+        : `⚡ <b>I am AgentGram — AI Mission Control for Rveta!</b> 🚀\n\n` +
+          `Your direct interactive bridge to the server over Telegram, supporting:\n` +
+          `• Executing all 58 governed agent skills\n` +
+          `• Running Pinpoint Ops rollout & deployment pipeline (<code>/pinpoint_go</code>)\n` +
+          `• Live terminal streaming of command executions\n` +
+          `• Complete security policy & prompt injection guards\n\n` +
+          `<i>Type <b>/</b> to browse skills and commands.</i>`;
+
+      await this.channel.sendMessage(this.allowedChatId, intro, {
+        replyToMessageId: msg.id,
+        replyMarkup: this.getMainKeyboard(),
+      });
+      return;
+    }
+
     // Commands
     if (text === '/start' || text === '/help') {
       await this.channel.sendMessage(

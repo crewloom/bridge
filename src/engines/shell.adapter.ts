@@ -105,6 +105,18 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
         if (fs.existsSync(script)) {
           resolvedPrompt = `python3 tools/ai/test_gates.py`;
         }
+      } else if (/[\u0600-\u06FF]/.test(resolvedPrompt)) {
+        // Natural language query in Shell mode - don't pass to bash
+        const toolId = `tool-${Date.now()}`;
+        this.emit('event', {
+          type: 'step_finish',
+          properties: {
+            id: toolId,
+            status: 'done',
+            output: `ℹ️ تم استلام رسالتك:\n"${resolvedPrompt}"\n\nالسيرفر يعمل ومتصل حياً (Online).\nلتنفيذ أمر مباشر على السيرفر اكتب الأمر (مثل: git status أو free -m).\nأو استخدم المهارات عبر القائمة بالضغط على / (مثل: /pinpoint_go أو /skills).`,
+          },
+        } as AgentEngineEvent);
+        return;
       }
     }
 
