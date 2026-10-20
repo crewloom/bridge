@@ -17,8 +17,11 @@ import type {
 import type { InlineKeyboardMarkup, TelegramUpdate } from '../domain/types.js';
 
 export function toTelegramMarkup(keyboard?: ChannelKeyboard): InlineKeyboardMarkup | undefined {
-  if (!keyboard || !keyboard.rows || keyboard.rows.length === 0) {
+  if (!keyboard) {
     return undefined;
+  }
+  if (!keyboard.rows || keyboard.rows.length === 0) {
+    return { inline_keyboard: [] };
   }
   return {
     inline_keyboard: keyboard.rows.map((row) =>

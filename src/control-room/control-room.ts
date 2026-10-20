@@ -619,9 +619,104 @@ export class ControlRoom {
       return;
     }
 
-    // 3. Busy check
+    // 3. Busy check & smart interactive responses
     if (this.activeRun && this.activeRun.busy) {
-      await this.channel.sendMessage(this.allowedChatId, t('room_busy', this.language));
+      const lower = promptText.trim().toLowerCase();
+
+      // Fast interrupt command while busy
+      if (
+        lower === 'stop' ||
+        lower === '/stop' ||
+        lower === 'وقف' ||
+        lower === 'إيقاف' ||
+        lower === 'الغاء' ||
+        lower === 'إلغاء' ||
+        lower === 'كنسل' ||
+        lower === 'abort' ||
+        lower === 'cancel'
+      ) {
+        await this.abortCurrentRun();
+        return;
+      }
+
+      // Fast presence/progress inquiry while running
+      if (
+        lower === 'st' ||
+        lower === '/status' ||
+        lower === 'status' ||
+        lower === 'شغال' ||
+        lower === 'شغال؟' ||
+        lower === 'خلصت؟' ||
+        lower === 'خلصت' ||
+        lower === 'الحالة' ||
+        lower === 'فينك'
+      ) {
+        const elapsed = Math.round((Date.now() - this.activeRun.startedAt) / 1000);
+        const activeCmd = this.activeRun.currentCommand
+          ? `<code>${escapeHtml(this.activeRun.currentCommand.slice(0, 150))}</code>`
+          : '<i>جاري التفكير والتنفيذ...</i>';
+
+        const busyReport =
+          this.language === 'ar'
+            ? `⚙️ <b>الوكيل يعمل حالياً:</b>\n` +
+              `• الأمر النشط: ${activeCmd}\n` +
+              `• الأوامر المنفذة: ⚙️ ${this.activeRun.cmds} · الملفات: 📝 ${this.activeRun.files.size}\n` +
+              `• المدة المنقضية: ⏳ ${elapsed} ثانية\n\n` +
+              `<i>أرسل "وقف" لإلغاء المهمة في أي وقت.</i>`
+            : `⚙️ <b>Agent is actively executing:</b>\n` +
+              `• Active command: ${activeCmd}\n` +
+              `• Commands run: ⚙️ ${this.activeRun.cmds} · Files: 📝 ${this.activeRun.files.size}\n` +
+              `• Elapsed time: ⏳ ${elapsed}s\n\n` +
+              `<i>Send "stop" to abort anytime.</i>`;
+
+        await this.channel.sendMessage(this.allowedChatId, busyReport, {
+          replyToMessageId: typeof replyToMsgId === 'number' ? replyToMsgId : undefined,
+          replyMarkup: {
+            rows: [
+              [
+                {
+                  text: this.language === 'ar' ? '🛑 إيقاف المهمة' : '🛑 Stop Task',
+                  callbackData: 'stop',
+                },
+                {
+                  text: this.language === 'ar' ? '📊 تحديث الحالة' : '📊 Refresh Status',
+                  callbackData: 'st',
+                },
+              ],
+            ],
+          },
+        });
+        return;
+      }
+
+      const elapsed = Math.round((Date.now() - this.activeRun.startedAt) / 1000);
+      const activeSnippet = escapeHtml((this.activeRun.currentCommand || 'جاري معالجة الخطوات').slice(0, 120));
+      const busyCard =
+        this.language === 'ar'
+          ? `⚠️ <b>الوكيل يعمل حالياً على مهمة سابقة (مرت ⏳ ${elapsed} ثانية):</b>\n` +
+            `• النشاط الحالي: <code>${activeSnippet}</code>\n\n` +
+            `انتظر انتهاء المهمة أو اضغط "إيقاف" لبدء طلبك الجديد فوراً.`
+          : `⚠️ <b>Agent is currently busy (${elapsed}s elapsed):</b>\n` +
+            `• Current action: <code>${activeSnippet}</code>\n\n` +
+            `Wait for it to finish or click "Stop" to start your new task immediately.`;
+
+      await this.channel.sendMessage(this.allowedChatId, busyCard, {
+        replyToMessageId: typeof replyToMsgId === 'number' ? replyToMsgId : undefined,
+        replyMarkup: {
+          rows: [
+            [
+              {
+                text: this.language === 'ar' ? '🛑 إيقاف المهمة والبدء بهذا' : '🛑 Stop & Start New',
+                callbackData: 'stop',
+              },
+              {
+                text: this.language === 'ar' ? '📊 تقرير الحالة' : '📊 Status Report',
+                callbackData: 'st',
+              },
+            ],
+          ],
+        },
+      });
       return;
     }
 
@@ -686,13 +781,18 @@ export class ControlRoom {
     // Permission callbacks
     if (data.startsWith('pm:o:')) {
       const permId = data.slice(5);
+      await this.channel.answerAction(cbId, this.language === 'ar' ? '✅ تم السماح لمرة واحدة' : '✅ Allowed once');
       await this.engine.replyPermission(permId, 'allow');
       if (messageId !== undefined) {
         try {
+          const badge = this.language === 'ar'
+            ? '✅ <b>تم السماح لمرة واحدة</b> • جاري المتابعة...'
+            : '✅ <b>Allowed once</b> • Continuing execution...';
           await this.channel.editMessage(
             this.allowedChatId,
             messageId,
-            `🔒 <b>طلب إذن تشغيل</b>\n✅ <i>تم السماح لمرة واحدة</i>`
+            `🔒 <b>${this.language === 'ar' ? 'طلب إذن تشغيل' : 'Permission Request'}</b>\n───────────────────────\n${badge}`,
+            { replyMarkup: { rows: [] } }
           );
         } catch {}
       }
@@ -704,13 +804,18 @@ export class ControlRoom {
       this.alwaysAllowedPerms.add(permId);
       this.alwaysAllowedPerms.add('bash');
       this.alwaysAllowedPerms.add('*');
+      await this.channel.answerAction(cbId, this.language === 'ar' ? '♾️ تم السماح دائماً' : '♾️ Always allowed');
       await this.engine.replyPermission(permId, 'always');
       if (messageId !== undefined) {
         try {
+          const badge = this.language === 'ar'
+            ? '♾️ <b>تم السماح دائماً</b> • معتمد لجميع العمليات والأوامر'
+            : '♾️ <b>Always allowed</b> • Approved for all operations';
           await this.channel.editMessage(
             this.allowedChatId,
             messageId,
-            `🔒 <b>طلب إذن تشغيل</b>\n♾️ <i>تم السماح دائماً بهذه العمليات</i>`
+            `🔒 <b>${this.language === 'ar' ? 'طلب إذن تشغيل' : 'Permission Request'}</b>\n───────────────────────\n${badge}`,
+            { replyMarkup: { rows: [] } }
           );
         } catch {}
       }
@@ -719,16 +824,37 @@ export class ControlRoom {
 
     if (data.startsWith('pm:r:')) {
       const permId = data.slice(5);
+      await this.channel.answerAction(cbId, this.language === 'ar' ? '⛔ تم رفض الإذن' : '⛔ Permission rejected');
       await this.engine.replyPermission(permId, 'reject');
+      if (messageId !== undefined) {
+        try {
+          const badge = this.language === 'ar'
+            ? '⛔ <b>تم رفض هذا الطلب بواسطة المستخدم</b>'
+            : '⛔ <b>Rejected by user</b>';
+          await this.channel.editMessage(
+            this.allowedChatId,
+            messageId,
+            `🔒 <b>${this.language === 'ar' ? 'طلب إذن تشغيل' : 'Permission Request'}</b>\n───────────────────────\n${badge}`,
+            { replyMarkup: { rows: [] } }
+          );
+        } catch {}
+      }
+      return;
+    }
+
+    if (data === 'stop') {
+      await this.channel.answerAction(cbId, this.language === 'ar' ? '🛑 جاري إيقاف المهمة...' : '🛑 Stopping task...');
       if (messageId !== undefined) {
         try {
           await this.channel.editMessage(
             this.allowedChatId,
             messageId,
-            `🔒 <b>طلب إذن تشغيل</b>\n⛔ <i>تم رفض هذا الإذن</i>`
+            `🔒 <b>${this.language === 'ar' ? 'طلب إذن تشغيل' : 'Permission Request'}</b>\n───────────────────────\n🛑 <b>${this.language === 'ar' ? 'تم إنهاء الجلسة بواسطة المستخدم' : 'Session terminated by user'}</b>`,
+            { replyMarkup: { rows: [] } }
           );
         } catch {}
       }
+      await this.abortCurrentRun();
       return;
     }
 

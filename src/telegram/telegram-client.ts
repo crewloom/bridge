@@ -136,7 +136,7 @@ export class TelegramClient {
       disable_web_page_preview: options.disableWebPagePreview ?? true,
     };
 
-    if (options.replyMarkup) payload.reply_markup = options.replyMarkup;
+    if (options.replyMarkup !== undefined) payload.reply_markup = options.replyMarkup;
     if (options.replyToMessageId) payload.reply_to_message_id = options.replyToMessageId;
 
     try {
@@ -166,7 +166,7 @@ export class TelegramClient {
       disable_web_page_preview: options.disableWebPagePreview ?? true,
     };
 
-    if (options.replyMarkup) payload.reply_markup = options.replyMarkup;
+    if (options.replyMarkup !== undefined) payload.reply_markup = options.replyMarkup;
 
     try {
       return await this.callApi<TelegramMessage>('editMessageText', payload);
