@@ -146,3 +146,72 @@ test('ShellEngineAdapter - executes command, captures events, and handles diff',
     await engine.abortSession(session.id);
   });
 });
+
+test('OpenCodeAdapter - normalizes OpenCode SSE events into standard AgentEngineEvents', async () => {
+  const { OpenCodeAdapter, OpenCodeClient } = await import('../dist/index.js');
+  const dummyClient = new OpenCodeClient('http://127.0.0.1:9999');
+  const adapter = new OpenCodeAdapter(dummyClient, process.cwd());
+
+  assert.equal(adapter.id, 'opencode');
+  assert.equal(adapter.name, 'OpenCode Agent');
+
+  const capturedEvents: any[] = [];
+  adapter.on('event', (e) => capturedEvents.push(e));
+
+  // 1. permission.asked should normalize to permission.ask
+  dummyClient.emit('event', {
+    type: 'permission.asked',
+    id: 'perm_123',
+    permission: 'bash',
+    patterns: ['ls -la'],
+    metadata: { command: 'ls -la' },
+  });
+
+  const permEvent = capturedEvents.find((e) => e.type === 'permission.ask');
+  assert.ok(permEvent, 'permission.ask must be emitted');
+  assert.equal(permEvent.properties?.id, 'perm_123');
+  assert.equal(permEvent.properties?.permission, 'bash');
+
+  // 2. message.part.updated (tool running) should normalize to tool.execute
+  dummyClient.emit('event', {
+    type: 'message.part.updated',
+    properties: {
+      sessionID: 'ses_test',
+      part: {
+        type: 'tool',
+        tool: 'bash',
+        callID: 'call_99',
+        state: { status: 'running', input: { command: 'echo 123' } },
+      },
+    },
+  });
+
+  const toolExec = capturedEvents.find((e) => e.type === 'tool.execute');
+  assert.ok(toolExec, 'tool.execute must be emitted');
+  assert.equal(toolExec.properties?.id, 'call_99');
+  assert.equal(toolExec.properties?.title, 'echo 123');
+
+  // 3. message.part.updated (text) + session.idle should normalize to step_finish
+  dummyClient.emit('event', {
+    type: 'message.part.updated',
+    properties: {
+      sessionID: 'ses_test',
+      part: {
+        type: 'text',
+        text: 'Task complete successfully',
+      },
+    },
+  });
+
+  dummyClient.emit('event', {
+    type: 'session.idle',
+    properties: {
+      sessionID: 'ses_test',
+    },
+  });
+
+  const stepFinish = capturedEvents.find((e) => e.type === 'step_finish');
+  assert.ok(stepFinish, 'step_finish must be emitted on session.idle');
+  assert.equal(stepFinish.properties?.status, 'done');
+  assert.equal(stepFinish.properties?.output, 'Task complete successfully');
+});

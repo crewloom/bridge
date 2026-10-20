@@ -1,5 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import * as os from 'node:os';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
+// Isolate test config directory so real ~/.config/agentgram is never modified by tests
+process.env.AGENTGRAM_CONFIG_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'ag-test-cfg-'));
+
 import { EventEmitter } from 'node:events';
 import {
   ControlRoom,

@@ -364,7 +364,7 @@ export class ControlRoom {
     if (text === '/start' || text === '/help' || text === '@help') {
       await this.channel.sendMessage(
         this.allowedChatId,
-        `⚡ <b>AgentGram v2.0.9 · Mission Control</b>\n${t('help_title', this.language)}`,
+        `⚡ <b>AgentGram v2.0.10 · Mission Control</b>\n${t('help_title', this.language)}`,
         { replyMarkup: this.getMainKeyboard() }
       );
       return;
@@ -969,13 +969,18 @@ export class ControlRoom {
     const props = (event.properties || {}) as Record<string, unknown>;
 
     // Permission required
-    if (type === 'permission.ask' || type === 'permission_request') {
-      const permId = String(props.id || '');
-      const tool = String(props.permission || 'tool');
-      const meta = (props.metadata || {}) as Record<string, unknown>;
+    if (type === 'permission.ask' || type === 'permission_request' || type === 'permission.asked') {
+      const permId = String(props.id || event.id || '');
+      const tool = String(props.permission || event.permission || 'tool');
+      const meta = (props.metadata || event.metadata || {}) as Record<string, unknown>;
       const cmd = String(meta.command || meta.filepath || '');
 
-      const { decision, reason } = decidePermission(props, this.currentMode, this.policy);
+      const patternsList = ((props.patterns || event.patterns) as string[]) || [];
+      const { decision, reason } = decidePermission(
+        { permission: tool, metadata: meta, patterns: patternsList },
+        this.currentMode,
+        this.policy
+      );
 
       if (this.alwaysAllowedPerms.has(permId) || decision === 'allow') {
         await this.engine.replyPermission(permId, 'allow');
@@ -1035,7 +1040,7 @@ export class ControlRoom {
     }
 
     // Step finish / complete
-    if (type === 'step_finish' || type === 'run.finish') {
+    if (type === 'step_finish' || type === 'run.finish' || type === 'session.idle') {
       this.activeRun.busy = false;
       this.activeRun.done = true;
       if (props.output) {
@@ -1060,6 +1065,25 @@ export class ControlRoom {
           { replyMarkup: this.getMainKeyboard() }
         );
       }
+      return;
+    }
+
+    // Session Error
+    if (type === 'session.error') {
+      const errObj = (props.error || {}) as Record<string, unknown>;
+      const dataObj = (errObj.data || {}) as Record<string, unknown>;
+      const errMsg = String(dataObj.message || errObj.message || errObj.name || 'Session error');
+
+      this.activeRun.busy = false;
+      this.activeRun.done = true;
+      this.activeRun.error = errMsg;
+      await this.updateMissionCard(true);
+
+      await this.channel.sendMessage(
+        this.allowedChatId,
+        `❌ <b>OpenCode Error</b>\n<pre><code>${escapeHtml(errMsg.slice(0, 3500))}</code></pre>`,
+        { replyMarkup: this.getMainKeyboard() }
+      );
       return;
     }
   }

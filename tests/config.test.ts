@@ -17,7 +17,7 @@ test('ConfigManager - configuration defaults are properly loaded', () => {
   assert.equal(cfg.config.defaultAgent, 'build');
   assert.equal(cfg.config.language, 'en');
   assert.ok(cfg.config.dailyLimit >= 50);
-  assert.ok(cfg.config.favoriteModels.includes('opencode/space-bunny-free'));
+  assert.ok(cfg.config.favoriteModels.includes('opencode/deepseek-v4.1-flash-free'));
 });
 
 test('ConfigManager - validation catches missing bot token and chat ID', () => {

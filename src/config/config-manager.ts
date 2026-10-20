@@ -12,6 +12,9 @@ export const LEGACY_CONFIG_DIR = path.join(os.homedir(), '.config', 'rumuze-edit
 export const AGENTGRAM_CONFIG_DIR = path.join(os.homedir(), '.config', 'agentgram');
 
 export function getGlobalConfigDir(): string {
+  if (process.env.AGENTGRAM_CONFIG_DIR) {
+    return process.env.AGENTGRAM_CONFIG_DIR;
+  }
   const agentgramConfigFile = path.join(AGENTGRAM_CONFIG_DIR, 'config.json');
   const legacyConfigFile = path.join(LEGACY_CONFIG_DIR, 'config.json');
   if (fs.existsSync(agentgramConfigFile)) {
@@ -25,19 +28,22 @@ export function getGlobalConfigDir(): string {
 
 export function ensureConfigDirs(): void {
   try {
-    if (!fs.existsSync(AGENTGRAM_CONFIG_DIR)) fs.mkdirSync(AGENTGRAM_CONFIG_DIR, { recursive: true, mode: 0o700 });
-    const stateDir = path.join(AGENTGRAM_CONFIG_DIR, 'state');
+    const targetDir = getGlobalConfigDir();
+    if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true, mode: 0o700 });
+    const stateDir = path.join(targetDir, 'state');
     if (!fs.existsSync(stateDir)) {
       fs.mkdirSync(stateDir, { recursive: true, mode: 0o700 });
     }
 
     // Auto-migrate legacy configuration if found
-    const legacyConfig = path.join(LEGACY_CONFIG_DIR, 'config.json');
-    const agentgramConfig = path.join(AGENTGRAM_CONFIG_DIR, 'config.json');
-    if (fs.existsSync(legacyConfig) && !fs.existsSync(agentgramConfig)) {
-      try {
-        fs.copyFileSync(legacyConfig, agentgramConfig);
-      } catch {}
+    if (!process.env.AGENTGRAM_CONFIG_DIR) {
+      const legacyConfig = path.join(LEGACY_CONFIG_DIR, 'config.json');
+      const agentgramConfig = path.join(AGENTGRAM_CONFIG_DIR, 'config.json');
+      if (fs.existsSync(legacyConfig) && !fs.existsSync(agentgramConfig)) {
+        try {
+          fs.copyFileSync(legacyConfig, agentgramConfig);
+        } catch {}
+      }
     }
   } catch {
     // Ignore permission or creation race conditions
@@ -90,12 +96,11 @@ export class ConfigManager {
       defaultAgent: 'build',
       defaultModel: '',
       favoriteModels: [
-        'opencode/space-bunny-free',
         'opencode/deepseek-v4.1-flash-free',
         'opencode/glm-5.3-flash-free',
-        'opencode/nemotron-3-ultra-free',
+        'opencode/beam-free',
+        'opencode/minimax-m3.1-flash-free',
         'opencode/mimo-v2.6-flash-free',
-        'opencode/longcat-2.5-preview-free',
       ],
       dailyLimit: 200,
       runTimeout: 30 * 60,
