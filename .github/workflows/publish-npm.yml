@@ -23,12 +23,16 @@ jobs:
           node-version: 20
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Clean build cache
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and verify
         run: |
-          npm run prepack
+          npm run build
+          npm test
 
       - name: Publish package to NPM
         run: |
-          npm publish --provenance --access public
+          npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
