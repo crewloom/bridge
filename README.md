@@ -41,10 +41,10 @@ Developers shouldn't be chained to their desks waiting for an AI agent to finish
 
 ```mermaid
 flowchart LR
-    User["📱 Telegram / Console / Webhook"] <-->|IChannelAdapter| ControlRoom["⚡ AgentGram Control Room"]
-    ControlRoom <-->|IAgentEngine| Engine["🤖 OpenCode / Claude Code / Shell"]
-    Engine <-->|Sandboxed Execution| Project["📂 Project Files & Git"]
-    ControlRoom <-->|Authorized Ops / SSH| Remote["🖥️ Remote VPS / Server"]
+    User["📱 Telegram / Console / Webhook"] -->|IChannelAdapter| ControlRoom["⚡ AgentGram Control Room"]
+    ControlRoom -->|IAgentEngine| Engine["🤖 OpenCode / Claude Code / Shell"]
+    Engine -->|Sandboxed Execution| Project["📂 Project Files & Git"]
+    ControlRoom -->|Authorized Ops / SSH| Remote["🖥️ Remote VPS / Server"]
 ```
 
 ### The Live Experience
