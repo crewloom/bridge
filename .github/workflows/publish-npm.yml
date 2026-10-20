@@ -33,6 +33,8 @@ jobs:
 
       - name: Publish package to NPM
         run: |
+          CLEAN_TOKEN=$(printf '%s' "${RAW_NPM_TOKEN}" | tr -d '\r\n[:space:]')
+          echo "//registry.npmjs.org/:_authToken=${CLEAN_TOKEN}" > ~/.npmrc
           npm publish --access public
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          RAW_NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
