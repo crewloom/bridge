@@ -34,7 +34,9 @@ jobs:
       - name: Publish package to NPM
         run: |
           CLEAN_TOKEN=$(printf '%s' "${RAW_NPM_TOKEN}" | tr -d '\r\n[:space:]')
-          echo "//registry.npmjs.org/:_authToken=${CLEAN_TOKEN}" > ~/.npmrc
-          npm publish --access public
+          WHOAMI=$(curl -s -H "Authorization: Bearer ${CLEAN_TOKEN}" https://registry.npmjs.org/-/whoami)
+          echo "NPM Token Whoami: ${WHOAMI}"
+          echo "//registry.npmjs.org/:_authToken=${CLEAN_TOKEN}" > "${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+          NODE_AUTH_TOKEN="${CLEAN_TOKEN}" npm publish --access public
         env:
           RAW_NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
