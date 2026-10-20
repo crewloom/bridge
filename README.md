@@ -135,6 +135,9 @@ Once connected, your Telegram chat becomes your project mission control:
 | **Live Status Card** | Edits automatically every ~2.5s showing active tools, steps, and output tails |
 | **Interactive Approvals** | Commands requiring approval render inline buttons: `[ ✅ Allow Once ]`, `[ ♾️ Always Allow ]`, `[ ⛔ Reject ]` |
 | **Interactive Questions** | Agent questions appear as clickable buttons (single-choice, multi-select, or custom text) |
+| **Fast Interrupt** | Type `stop`, `وقف`, or `إيقاف` at any time to immediately cancel execution |
+| **Presence Check** | Ask `هل انت شغال؟`, `الحالة`, or `status` to get an instant live status report |
+| **Instant Mentions** | Mention `@agent` or `@model` in any message to dynamically switch personas |
 | `/mode` | Switch execution mode: `read` (read-only diagnosis), `build` (interactive approval), or `auto` (autonomous execution) |
 | `/agents` | Switch active agent persona on the fly (e.g. `build`, `delegate`, `code-review`) |
 | `/models` | Switch LLM provider and model dynamically |

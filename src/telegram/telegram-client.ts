@@ -28,6 +28,28 @@ export function stripHtml(html: string): string {
   return html.replace(/<\/?[a-zA-Z][^>]*>/g, '');
 }
 
+export function splitTextSafely(text: string, maxLen = 3800): string[] {
+  if (!text || text.length <= maxLen) return [text || ''];
+  const chunks: string[] = [];
+  let remaining = text;
+  while (remaining.length > 0) {
+    if (remaining.length <= maxLen) {
+      chunks.push(remaining);
+      break;
+    }
+    let splitIdx = remaining.lastIndexOf('\n', maxLen);
+    if (splitIdx < maxLen * 0.5) {
+      splitIdx = remaining.lastIndexOf(' ', maxLen);
+    }
+    if (splitIdx < maxLen * 0.3) {
+      splitIdx = maxLen;
+    }
+    chunks.push(remaining.slice(0, splitIdx));
+    remaining = remaining.slice(splitIdx).trimStart();
+  }
+  return chunks;
+}
+
 export class TelegramClient {
   private readonly token: string;
   private readonly agent: https.Agent;
@@ -57,6 +79,14 @@ export class TelegramClient {
         const response = await this.postJson(url, body);
         if (response.ok) {
           return response.result as T;
+        }
+
+        // Handle 429 Rate Limiting with retry_after
+        if (response.error_code === 429) {
+          const params = (response as unknown as { parameters?: { retry_after?: number } }).parameters;
+          const waitSec = params?.retry_after ?? attempt * 2;
+          await new Promise((r) => setTimeout(r, (waitSec + 1) * 1000));
+          continue;
         }
 
         // If Telegram returns 400 with entity parse error and message has HTML, caller can fallback
@@ -129,6 +159,27 @@ export class TelegramClient {
     text: string,
     options: SendMessageOptions = {}
   ): Promise<TelegramMessage> {
+    if (text.length > 4000) {
+      const chunks = splitTextSafely(text, 3900);
+      let lastMsg!: TelegramMessage;
+      for (let i = 0; i < chunks.length; i++) {
+        const chunkOpts: SendMessageOptions = {
+          ...options,
+          replyMarkup: i === chunks.length - 1 ? options.replyMarkup : undefined,
+          replyToMessageId: i === 0 ? options.replyToMessageId : undefined,
+        };
+        lastMsg = await this.sendSingleMessage(chatId, chunks[i] || '', chunkOpts);
+      }
+      return lastMsg;
+    }
+    return this.sendSingleMessage(chatId, text, options);
+  }
+
+  private async sendSingleMessage(
+    chatId: string | number,
+    text: string,
+    options: SendMessageOptions = {}
+  ): Promise<TelegramMessage> {
     const payload: Record<string, unknown> = {
       chat_id: chatId,
       text,
@@ -158,10 +209,15 @@ export class TelegramClient {
     text: string,
     options: SendMessageOptions = {}
   ): Promise<TelegramMessage | boolean> {
+    let cleanText = text;
+    if (cleanText.length > 4000) {
+      cleanText = cleanText.slice(0, 3900) + '\n... [truncated]';
+    }
+
     const payload: Record<string, unknown> = {
       chat_id: chatId,
       message_id: messageId,
-      text,
+      text: cleanText,
       parse_mode: 'HTML',
       disable_web_page_preview: options.disableWebPagePreview ?? true,
     };
@@ -178,7 +234,7 @@ export class TelegramClient {
       }
       // 400 Fallback
       if (msg.includes('(400)')) {
-        payload.text = stripHtml(text);
+        payload.text = stripHtml(cleanText);
         delete payload.parse_mode;
         return await this.callApi<TelegramMessage>('editMessageText', payload);
       }

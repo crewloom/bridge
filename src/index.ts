@@ -27,7 +27,7 @@ export * from './channels/index.js';
 export * from './engines/index.js';
 
 // Re-export Telegram Bot Client
-export { TelegramClient, escapeHtml } from './telegram/telegram-client.js';
+export { TelegramClient, escapeHtml, stripHtml, splitTextSafely, type SendMessageOptions } from './telegram/telegram-client.js';
 
 // Re-export OpenCode Integration
 export { OpenCodeClient, type OpenCodeEvent, getFreePort } from './opencode/opencode-client.js';

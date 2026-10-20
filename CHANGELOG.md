@@ -9,6 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.11] - 2026-10-20
+
+### Fixed
+- **Permission ID Extraction**: Resolved bug where OpenCode SSE wrapper event ID (`evt_...`) was prioritized over actual permission ID (`per_...`), causing OpenCode HTTP 400 Bad Request on replies.
+- **Instant UI Dismissal**: Inline permission keyboards are immediately dismissed upon button click (`replyMarkup: { rows: [] }`) with persistent confirmation badges, preventing duplicate taps or hanging buttons.
+- **Telegram 409 Conflict Throttling**: Added intelligent backoff and log throttling for concurrent instance conflicts to prevent log disk filling.
+- **Telegram 429 Rate-Limit Compliance**: Automatic handling of `retry_after` parameters with exponential backoff on burst traffic.
+- **Message Overflow Protection**: Added `splitTextSafely` for automatic message chunking (> 4000 chars) and clean truncation on edited status cards.
+
+### Added
+- **Batch Permission Auto-Resolution**: When "Always Allow" is selected, any existing queued permissions in OpenCode are automatically resolved in batch.
+- **Resilient SSE Connection Pool**: Automatic transparent reconnection on connection drops, timeouts, or server restarts with exponential backoff.
+- **Unit Test Suite Expansion**: Added dedicated tests for OpenCode SSE event priority normalization and Telegram text splitting.
+
+---
+
+## [2.0.10] - 2026-10-20
+
+### Added
+- **Async Prompting Protocol**: Migrated to OpenCode `POST /session/{id}/prompt_async` with structured parts array payload.
+- **Global SSE Endpoint**: Switched to `/global/event?directory=...` for unified event streaming across sessions.
+- **Interactive Fast Interrupts**: Added instant one-word controls (`وقف`, `stop`, `إيقاف`) and natural language presence queries (`هل انت شغال؟`, `الحالة`).
+- **Free Model Support**: Configured default fallback model to `opencode/deepseek-v4.1-flash-free`.
+
+---
+
+## [2.0.0] - 2026-10-19
+
+### Added
+- **Full TypeScript & Node.js 18+ Rewrite**: Completely migrated codebase from Python to 100% pure TypeScript.
+- **Zero Runtime Dependencies**: Completely standalone runtime using native Node.js standard library (`https`, `crypto`, `child_process`, `events`).
+- **Hexagonal Architecture**: Pluggable Channel Abstraction (`IChannelAdapter`) and Agent Engine Abstraction (`IAgentEngine`).
+- **Native OS Daemon Integration**: Auto-generating and controlling macOS `launchd` LaunchAgents and Linux `systemd` user units.
+- **Dual Package CLI**: Single unified binary supporting `agentgram`, `ag`, and backward-compatible `rumuze-edit`.
+
+---
+
 ## [1.0.7] - 2026-10-18
 
 ### Added

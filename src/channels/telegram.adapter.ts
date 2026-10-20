@@ -57,6 +57,7 @@ export class TelegramChannelAdapter implements IChannelAdapter {
   public readonly client: TelegramClient;
   private isListening = false;
   private pollOffset = 0;
+  private lastConflictReport = 0;
 
   constructor(clientOrToken: TelegramClient | string) {
     if (typeof clientOrToken === 'string') {
@@ -79,10 +80,16 @@ export class TelegramChannelAdapter implements IChannelAdapter {
             await this.processUpdate(update, handler);
           }
         } catch (err) {
+          const errMsg = (err as Error).message || '';
+          const is409 = errMsg.includes('(409)');
           if (handler.onError) {
-            handler.onError(err as Error);
+            // Throttle 409 conflict logs to avoid log flooding during service restarts
+            if (!is409 || Date.now() - this.lastConflictReport > 60000) {
+              this.lastConflictReport = Date.now();
+              handler.onError(err as Error);
+            }
           }
-          await new Promise((r) => setTimeout(r, 2000));
+          await new Promise((r) => setTimeout(r, is409 ? 5000 : 2000));
         }
       }
     })().catch((err) => {

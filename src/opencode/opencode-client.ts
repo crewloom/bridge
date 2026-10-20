@@ -33,6 +33,8 @@ export class OpenCodeClient extends EventEmitter {
   private serverProcess?: child_process.ChildProcess | undefined;
   private sseReq?: http.ClientRequest | undefined;
   private isConnected = false;
+  private shouldReconnect = true;
+  private reconnectTimer: NodeJS.Timeout | null = null;
 
   constructor(baseUrl: string, password?: string, directory?: string) {
     super();
@@ -119,9 +121,14 @@ export class OpenCodeClient extends EventEmitter {
   }
 
   /**
-   * Start consuming Server-Sent Events (SSE) from the OpenCode server.
+   * Start consuming Server-Sent Events (SSE) from the OpenCode server with resilient auto-reconnect.
    */
   public connectEventStream(): void {
+    this.shouldReconnect = true;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.isConnected) return;
 
     const url = new URL(`${this.baseUrl}/global/event`);
@@ -149,6 +156,7 @@ export class OpenCodeClient extends EventEmitter {
     req.on('response', (res) => {
       if ((res.statusCode || 0) >= 400) {
         this.emit('error', new Error(`SSE stream returned HTTP ${res.statusCode}`));
+        this.scheduleReconnect();
         return;
       }
 
@@ -183,18 +191,35 @@ export class OpenCodeClient extends EventEmitter {
       res.on('end', () => {
         this.isConnected = false;
         this.emit('disconnected');
+        this.scheduleReconnect();
       });
     });
 
     req.on('error', (err) => {
       this.isConnected = false;
       this.emit('error', err);
+      this.scheduleReconnect();
     });
 
     req.end();
   }
 
+  private scheduleReconnect(): void {
+    if (!this.shouldReconnect || this.reconnectTimer) return;
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.shouldReconnect && !this.isConnected) {
+        this.connectEventStream();
+      }
+    }, 2000);
+  }
+
   public disconnectEventStream(): void {
+    this.shouldReconnect = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     if (this.sseReq) {
       this.sseReq.destroy();
       this.sseReq = undefined;

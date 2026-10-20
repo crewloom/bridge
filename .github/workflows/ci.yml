@@ -32,6 +32,9 @@ jobs:
       - name: Build TypeScript bundle
         run: npm run build
 
+      - name: Strict Typecheck
+        run: npx tsc --noEmit
+
       - name: Run Native Test Suite
         run: npm test
 

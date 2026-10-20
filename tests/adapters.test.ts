@@ -8,6 +8,8 @@ import {
   TelegramChannelAdapter,
   toTelegramMarkup,
   fromTelegramMarkup,
+  splitTextSafely,
+  stripHtml,
   type IChannelAdapter,
   type IAgentEngine,
   type AgentgramConfig,
@@ -86,6 +88,25 @@ test('TelegramChannelAdapter - converts ChannelKeyboard to Telegram inline marku
   assert.equal(converted.rows.length, 2);
   assert.equal(converted.rows[0]?.[0]?.text, 'Allow');
   assert.equal(converted.rows[0]?.[0]?.callbackData, 'pm:o:123');
+});
+
+test('Telegram Utilities - splitTextSafely and stripHtml prevent message overflow and parse errors', () => {
+  // Test stripHtml
+  assert.equal(stripHtml('<b>Bold</b> & <i>Italic</i>'), 'Bold & Italic');
+  assert.equal(stripHtml('Plain text without HTML'), 'Plain text without HTML');
+  assert.equal(stripHtml(''), '');
+
+  // Test splitTextSafely under limit
+  assert.deepEqual(splitTextSafely('Short text', 100), ['Short text']);
+
+  // Test splitTextSafely over limit splits at newlines cleanly
+  const longText = 'Line 1\nLine 2\nLine 3\nLine 4\nLine 5';
+  const chunks = splitTextSafely(longText, 15);
+  assert.ok(chunks.length > 1);
+  for (const chunk of chunks) {
+    assert.ok(chunk.length <= 15, `Chunk "${chunk}" must be <= 15 chars`);
+  }
+  assert.equal(chunks.join('\n'), longText);
 });
 
 test('ConsoleChannelAdapter - sends and edits messages with formatted output', async () => {
