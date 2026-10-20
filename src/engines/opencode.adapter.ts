@@ -46,10 +46,18 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
 
     // 1. Permission request event normalization (OpenCode emits 'permission.asked')
     if (type === 'permission.asked' || type === 'permission.ask') {
-      const permId = String(event.id || props.id || '');
-      const permission = String(event.permission || props.permission || 'tool');
-      const patterns = (event.patterns || props.patterns || ['*']) as string[];
-      const metadata = (event.metadata || props.metadata || {}) as Record<string, unknown>;
+      const permId = String(
+        (props.id && String(props.id).startsWith('per'))
+          ? props.id
+          : (props.requestID && String(props.requestID).startsWith('per'))
+          ? props.requestID
+          : (event.id && String(event.id).startsWith('per'))
+          ? event.id
+          : (props.id || props.requestID || event.id || '')
+      );
+      const permission = String(props.permission || event.permission || 'tool');
+      const patterns = (props.patterns || event.patterns || ['*']) as string[];
+      const metadata = (props.metadata || event.metadata || {}) as Record<string, unknown>;
 
       this.emit('event', {
         type: 'permission.ask',

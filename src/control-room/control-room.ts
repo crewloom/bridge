@@ -782,7 +782,6 @@ export class ControlRoom {
     if (data.startsWith('pm:o:')) {
       const permId = data.slice(5);
       await this.channel.answerAction(cbId, this.language === 'ar' ? '✅ تم السماح لمرة واحدة' : '✅ Allowed once');
-      await this.engine.replyPermission(permId, 'allow');
       if (messageId !== undefined) {
         try {
           const badge = this.language === 'ar'
@@ -796,6 +795,12 @@ export class ControlRoom {
           );
         } catch {}
       }
+      try {
+        await this.engine.replyPermission(permId, 'allow');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('Permission reply failed:', msg);
+      }
       return;
     }
 
@@ -805,7 +810,6 @@ export class ControlRoom {
       this.alwaysAllowedPerms.add('bash');
       this.alwaysAllowedPerms.add('*');
       await this.channel.answerAction(cbId, this.language === 'ar' ? '♾️ تم السماح دائماً' : '♾️ Always allowed');
-      await this.engine.replyPermission(permId, 'always');
       if (messageId !== undefined) {
         try {
           const badge = this.language === 'ar'
@@ -819,13 +823,18 @@ export class ControlRoom {
           );
         } catch {}
       }
+      try {
+        await this.engine.replyPermission(permId, 'always');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('Permission reply failed:', msg);
+      }
       return;
     }
 
     if (data.startsWith('pm:r:')) {
       const permId = data.slice(5);
       await this.channel.answerAction(cbId, this.language === 'ar' ? '⛔ تم رفض الإذن' : '⛔ Permission rejected');
-      await this.engine.replyPermission(permId, 'reject');
       if (messageId !== undefined) {
         try {
           const badge = this.language === 'ar'
@@ -838,6 +847,12 @@ export class ControlRoom {
             { replyMarkup: { rows: [] } }
           );
         } catch {}
+      }
+      try {
+        await this.engine.replyPermission(permId, 'reject');
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('Permission reply failed:', msg);
       }
       return;
     }
@@ -1116,7 +1131,15 @@ export class ControlRoom {
 
     // Permission required
     if (type === 'permission.ask' || type === 'permission_request' || type === 'permission.asked') {
-      const permId = String(props.id || event.id || '');
+      const permId = String(
+        (props.id && String(props.id).startsWith('per'))
+          ? props.id
+          : (props.requestID && String(props.requestID).startsWith('per'))
+          ? props.requestID
+          : (event.id && String(event.id).startsWith('per'))
+          ? event.id
+          : (props.id || props.requestID || event.id || '')
+      );
       const tool = String(props.permission || event.permission || 'tool');
       const meta = (props.metadata || event.metadata || {}) as Record<string, unknown>;
       const cmd = String(meta.command || meta.filepath || '');
@@ -1134,12 +1157,16 @@ export class ControlRoom {
         this.alwaysAllowedPerms.has('*') ||
         decision === 'allow'
       ) {
-        await this.engine.replyPermission(permId, 'always');
+        try {
+          await this.engine.replyPermission(permId, 'always');
+        } catch {}
         return;
       }
 
       if (decision === 'reject') {
-        await this.engine.replyPermission(permId, 'reject');
+        try {
+          await this.engine.replyPermission(permId, 'reject');
+        } catch {}
         if (reason) {
           await this.channel.sendMessage(this.allowedChatId, `⛔ ${escapeHtml(reason)}`);
         }

@@ -172,6 +172,26 @@ test('OpenCodeAdapter - normalizes OpenCode SSE events into standard AgentEngine
   assert.equal(permEvent.properties?.id, 'perm_123');
   assert.equal(permEvent.properties?.permission, 'bash');
 
+  // 1b. OpenCode SSE format: event.id has 'evt_...' while event.properties.id has 'per_...'
+  dummyClient.emit('event', {
+    type: 'permission.asked',
+    id: 'evt_159a6334f00297Zng0y0WKSvfi',
+    properties: {
+      id: 'per_159a6334f001sN8seSSePBe08Q',
+      permission: 'bash',
+      patterns: ['git status'],
+      metadata: { command: 'git status' },
+    },
+  });
+  const permEvents = capturedEvents.filter((e) => e.type === 'permission.ask');
+  const secondPerm = permEvents[1];
+  assert.ok(secondPerm, 'second permission.ask must be emitted');
+  assert.equal(
+    secondPerm.properties?.id,
+    'per_159a6334f001sN8seSSePBe08Q',
+    'Must prioritize per_ permission ID over evt_ event wrapper ID'
+  );
+
   // 2. message.part.updated (tool running) should normalize to tool.execute
   dummyClient.emit('event', {
     type: 'message.part.updated',

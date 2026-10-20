@@ -227,12 +227,35 @@ export class OpenCodeClient extends EventEmitter {
     return this.request('POST', `/session/${sessionId}/prompt_async`, body);
   }
 
+  public async listPermissions(): Promise<Array<{ id: string; sessionID?: string; permission?: string }>> {
+    try {
+      const res = await this.request<Array<{ id: string; sessionID?: string; permission?: string }>>('GET', '/permission');
+      return Array.isArray(res) ? res : [];
+    } catch {
+      return [];
+    }
+  }
+
   public async replyPermission(
     permissionId: string,
     decision: 'allow' | 'always' | 'reject'
   ): Promise<unknown> {
     const reply = decision === 'always' ? 'always' : decision === 'allow' ? 'once' : 'reject';
-    return this.request('POST', `/permission/${permissionId}/reply`, { reply });
+    const res = await this.request('POST', `/permission/${permissionId}/reply`, { reply });
+
+    // When "always" is selected, also clear any other pending permissions in this session
+    if (decision === 'always') {
+      try {
+        const others = await this.listPermissions();
+        for (const item of others) {
+          if (item && item.id && item.id !== permissionId) {
+            await this.request('POST', `/permission/${item.id}/reply`, { reply: 'always' }).catch(() => {});
+          }
+        }
+      } catch {}
+    }
+
+    return res;
   }
 
   public async replyQuestion(questionId: string, answers: string[]): Promise<unknown> {
