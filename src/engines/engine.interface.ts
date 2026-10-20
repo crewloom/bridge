@@ -73,7 +73,7 @@ export interface IAgentEngine extends EventEmitter {
    */
   replyPermission(
     permissionId: string,
-    decision: 'allow' | 'reject'
+    decision: 'allow' | 'always' | 'reject'
   ): Promise<void>;
 
   /**

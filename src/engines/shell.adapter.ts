@@ -247,7 +247,7 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
 
   public async replyPermission(
     _permissionId: string,
-    _decision: 'allow' | 'reject'
+    _decision: 'allow' | 'always' | 'reject'
   ): Promise<void> {
     // Shell process permission acknowledgement
   }

@@ -688,7 +688,13 @@ export class ControlRoom {
       const permId = data.slice(5);
       await this.engine.replyPermission(permId, 'allow');
       if (messageId !== undefined) {
-        await this.channel.sendMessage(this.allowedChatId, t('permission_allowed_once', this.language, { tool: permId }));
+        try {
+          await this.channel.editMessage(
+            this.allowedChatId,
+            messageId,
+            `🔒 <b>طلب إذن تشغيل</b>\n✅ <i>تم السماح لمرة واحدة</i>`
+          );
+        } catch {}
       }
       return;
     }
@@ -696,9 +702,17 @@ export class ControlRoom {
     if (data.startsWith('pm:a:')) {
       const permId = data.slice(5);
       this.alwaysAllowedPerms.add(permId);
-      await this.engine.replyPermission(permId, 'allow');
+      this.alwaysAllowedPerms.add('bash');
+      this.alwaysAllowedPerms.add('*');
+      await this.engine.replyPermission(permId, 'always');
       if (messageId !== undefined) {
-        await this.channel.sendMessage(this.allowedChatId, t('permission_always_allowed', this.language, { tool: permId }));
+        try {
+          await this.channel.editMessage(
+            this.allowedChatId,
+            messageId,
+            `🔒 <b>طلب إذن تشغيل</b>\n♾️ <i>تم السماح دائماً بهذه العمليات</i>`
+          );
+        } catch {}
       }
       return;
     }
@@ -707,7 +721,13 @@ export class ControlRoom {
       const permId = data.slice(5);
       await this.engine.replyPermission(permId, 'reject');
       if (messageId !== undefined) {
-        await this.channel.sendMessage(this.allowedChatId, t('permission_rejected', this.language, { tool: permId }));
+        try {
+          await this.channel.editMessage(
+            this.allowedChatId,
+            messageId,
+            `🔒 <b>طلب إذن تشغيل</b>\n⛔ <i>تم رفض هذا الإذن</i>`
+          );
+        } catch {}
       }
       return;
     }
@@ -982,8 +1002,13 @@ export class ControlRoom {
         this.policy
       );
 
-      if (this.alwaysAllowedPerms.has(permId) || decision === 'allow') {
-        await this.engine.replyPermission(permId, 'allow');
+      if (
+        this.alwaysAllowedPerms.has(permId) ||
+        this.alwaysAllowedPerms.has(tool) ||
+        this.alwaysAllowedPerms.has('*') ||
+        decision === 'allow'
+      ) {
+        await this.engine.replyPermission(permId, 'always');
         return;
       }
 

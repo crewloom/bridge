@@ -227,8 +227,11 @@ export class OpenCodeClient extends EventEmitter {
     return this.request('POST', `/session/${sessionId}/prompt_async`, body);
   }
 
-  public async replyPermission(permissionId: string, decision: 'allow' | 'reject'): Promise<unknown> {
-    const reply = decision === 'allow' ? 'once' : 'reject';
+  public async replyPermission(
+    permissionId: string,
+    decision: 'allow' | 'always' | 'reject'
+  ): Promise<unknown> {
+    const reply = decision === 'always' ? 'always' : decision === 'allow' ? 'once' : 'reject';
     return this.request('POST', `/permission/${permissionId}/reply`, { reply });
   }
 

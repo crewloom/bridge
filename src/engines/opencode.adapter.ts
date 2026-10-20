@@ -201,7 +201,7 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
 
   public async replyPermission(
     permissionId: string,
-    decision: 'allow' | 'reject'
+    decision: 'allow' | 'always' | 'reject'
   ): Promise<void> {
     await this.client.replyPermission(permissionId, decision);
   }
