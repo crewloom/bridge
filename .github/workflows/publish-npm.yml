@@ -4,6 +4,11 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      otp:
+        description: 'NPM 2FA OTP Code (optional, leave empty if using an Automation token)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -47,6 +52,10 @@ jobs:
               require('fs').writeFileSync(process.env.NPM_CONFIG_USERCONFIG, '//registry.npmjs.org/:_authToken=' + clean + '\n');
             }
           "
-          npm publish --access public
+          if [ -n "${{ github.event.inputs.otp }}" ]; then
+            npm publish --access public --otp="${{ github.event.inputs.otp }}"
+          else
+            npm publish --access public
+          fi
         env:
           RAW_NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
