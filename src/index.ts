@@ -52,8 +52,18 @@ export {
 // Re-export Localization Engine
 export { t, TRANSLATIONS, TRANSLATIONS as translations, type Language, type TranslationKey } from './i18n/index.js';
 
-// Re-export CLI & Version
-export { runCli, VERSION } from './cli/index.js';
+// Re-export Constants & Versioning Single Source of Truth
+export {
+  APP_NAME,
+  APP_VERSION,
+  APP_DISPLAY_NAME,
+  APP_MISSION_CONTROL_HEADER,
+  APP_COMMANDS_HEADER,
+  VERSION,
+} from './constants.js';
+
+// Re-export CLI
+export { runCli } from './cli/index.js';
 
 // Auto-run CLI if invoked directly via terminal / npx
 if (typeof require !== 'undefined' && require.main === module) {

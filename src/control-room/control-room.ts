@@ -27,6 +27,10 @@ import { ConfigManager } from '../config/config-manager.js';
 import { t } from '../i18n/index.js';
 import { resolveModelMetadata, getStandardModelCatalog, KNOWN_MODELS } from '../domain/model-catalog.js';
 import {
+  APP_MISSION_CONTROL_HEADER,
+  APP_COMMANDS_HEADER,
+} from '../constants.js';
+import {
   buildModelsMenuView,
   buildSkillsMenuView,
   buildAgentsMenuView,
@@ -432,7 +436,7 @@ export class ControlRoom {
     if (text === '/start' || text === '/help' || text === '@help') {
       await this.channel.sendMessage(
         this.allowedChatId,
-        `⚡ <b>AgentGram v2.0.12 · Mission Control</b>\n${t('help_title', this.language)}`,
+        `${APP_MISSION_CONTROL_HEADER}\n${t('help_title', this.language)}`,
         { replyMarkup: this.getMainKeyboard() }
       );
       return;
@@ -1271,7 +1275,7 @@ export class ControlRoom {
       await answerToast();
       await this.channel.sendMessage(
         this.allowedChatId,
-        `⚡ <b>AgentGram Commands & Mission Control</b>\n${t('help_title', this.language)}`,
+        `${APP_COMMANDS_HEADER}\n${t('help_title', this.language)}`,
         { replyMarkup: this.getMainKeyboard() }
       );
       return;

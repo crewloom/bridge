@@ -20,8 +20,9 @@ import { ShellEngineAdapter } from '../engines/shell.adapter.js';
 import { EngineRegistry } from '../engines/registry.js';
 import type { IAgentEngine } from '../engines/engine.interface.js';
 import { ServiceManager, getEntryPoint } from '../service/service-manager.js';
+import { VERSION, APP_NAME, APP_VERSION } from '../constants.js';
 
-export const VERSION = '2.0.12';
+export { VERSION, APP_NAME, APP_VERSION };
 
 // ANSI Styling Tokens
 export const C = {
