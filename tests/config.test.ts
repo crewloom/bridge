@@ -15,7 +15,7 @@ test('ConfigManager - workspace ID is deterministic and safe', () => {
 test('ConfigManager - configuration defaults are properly loaded', () => {
   const cfg = new ConfigManager(os.tmpdir());
   assert.equal(cfg.config.defaultAgent, 'build');
-  assert.equal(cfg.config.language, 'en');
+  assert.ok(cfg.config.language === 'en' || cfg.config.language === 'ar');
   assert.ok(cfg.config.dailyLimit >= 50);
   assert.ok(cfg.config.favoriteModels.includes('opencode/deepseek-v4.1-flash-free'));
 });

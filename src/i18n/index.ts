@@ -111,6 +111,7 @@ export const TRANSLATIONS = {
 } as const;
 
 export type Language = 'en' | 'ar';
+export type SupportedLanguage = Language;
 export type TranslationKey = keyof typeof TRANSLATIONS.en;
 
 export function t(key: TranslationKey, lang: Language = 'en', params?: Record<string, string | number>): string {

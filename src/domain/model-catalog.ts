@@ -175,13 +175,93 @@ export const KNOWN_MODELS: Record<string, ModelMetadata> = {
     tag: 'Lightweight Quick Edits',
     tier: 'free',
   },
+  'opencode/minimax-m3.1-flash-free': {
+    id: 'opencode/minimax-m3.1-flash-free',
+    name: 'MiniMax M3.1 Flash',
+    provider: 'MiniMax',
+    contextWindow: '1M',
+    tag: 'Ultra-Long 1M Context & Fast Execution',
+    tier: 'free',
+  },
+  'opencode/beam-free': {
+    id: 'opencode/beam-free',
+    name: 'Beam Free',
+    provider: 'OpenCode Free',
+    contextWindow: '128k',
+    tag: 'Lightweight Fast Automation',
+    tier: 'free',
+  },
+  'opencode/big-pickle': {
+    id: 'opencode/big-pickle',
+    name: 'Big Pickle',
+    provider: 'OpenCode Free',
+    contextWindow: '128k',
+    tag: 'High-Capacity Free Model',
+    tier: 'free',
+  },
+  'opencode/nemotron-3.5-lightning-free': {
+    id: 'opencode/nemotron-3.5-lightning-free',
+    name: 'Nemotron 3.5 Lightning',
+    provider: 'NVIDIA',
+    contextWindow: '128k',
+    tag: 'NVIDIA Lightning Inference',
+    tier: 'free',
+  },
+  'opencode/nemotron-3.5-super-vl-free': {
+    id: 'opencode/nemotron-3.5-super-vl-free',
+    name: 'Nemotron 3.5 Super VL',
+    provider: 'NVIDIA',
+    contextWindow: '128k',
+    tag: 'NVIDIA Vision-Language Model',
+    tier: 'free',
+  },
   'opencode/longcat-2.5-preview-free': {
     id: 'opencode/longcat-2.5-preview-free',
     name: 'LongCat 2.5 Preview',
-    provider: 'OpenCode Free',
-    contextWindow: '128k',
-    tag: 'Long Context Free Preview',
+    provider: 'Meituan',
+    contextWindow: '1M',
+    tag: '1M Tokens Long-Context Reasoning',
     tier: 'free',
+  },
+  'deepseek/deepseek-flash': {
+    id: 'deepseek/deepseek-flash',
+    name: 'DeepSeek Flash',
+    provider: 'DeepSeek',
+    contextWindow: '128k',
+    tag: 'Ultra-Fast Architecture & Coding',
+    tier: 'standard',
+  },
+  'deepseek/deepseek-v4-pro': {
+    id: 'deepseek/deepseek-v4-pro',
+    name: 'DeepSeek v4 Pro',
+    provider: 'DeepSeek',
+    contextWindow: '128k',
+    tag: 'Advanced SOTA Code Synthesis',
+    tier: 'flagship',
+  },
+  'gemini-2.0-flash-exp': {
+    id: 'gemini-2.0-flash-exp',
+    name: 'Gemini 2.0 Flash Exp',
+    provider: 'Google',
+    contextWindow: '1M',
+    tag: 'Next-Gen 1M Multimodal & Speed',
+    tier: 'flagship',
+  },
+  'gemini-2.0-flash-thinking-exp': {
+    id: 'gemini-2.0-flash-thinking-exp',
+    name: 'Gemini 2.0 Flash Thinking',
+    provider: 'Google',
+    contextWindow: '1M',
+    tag: 'Deep Reasoning 1M Context Window',
+    tier: 'flagship',
+  },
+  'claude-3-7-sonnet': {
+    id: 'claude-3-7-sonnet',
+    name: 'Claude 3.7 Sonnet',
+    provider: 'Anthropic',
+    contextWindow: '200k',
+    tag: 'Hybrid Thinking & Agentic Coding',
+    tier: 'flagship',
   },
 
   // Open Weights
@@ -199,17 +279,30 @@ export const KNOWN_MODELS: Record<string, ModelMetadata> = {
  * Clean and format model ID into human-readable label
  */
 export function formatModelName(modelId: string): string {
-  const parts = modelId.split('/');
-  const base = parts[parts.length - 1] || modelId;
+  if (!modelId) return 'Default Model';
+  // Strip trailing :free or -free
+  const clean = modelId.replace(/:free$/i, '').replace(/-free$/i, '');
+  // Strip provider prefix if present
+  const parts = clean.split('/');
+  const base = parts[parts.length - 1] || clean;
   return base
-    .replace(/-free$/i, '')
-    .split('-')
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .replace(/[_-]/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((w) => {
+      const lower = w.toLowerCase();
+      if (lower === 'minimax') return 'MiniMax';
+      if (lower === 'deepseek') return 'DeepSeek';
+      if (['gpt', 'glm', 'cot', 'ai', 'vl', 'r1', 'v3', 'v4', 'm3.1', 'm3'].includes(lower)) {
+        return w.toUpperCase();
+      }
+      return w.charAt(0).toUpperCase() + w.slice(1);
+    })
     .join(' ');
 }
 
 /**
- * Resilient, universal metadata resolver
+ * Resilient, universal metadata resolver with smart context window extraction
  */
 export function resolveModelMetadata(modelId: string): ModelMetadata {
   if (!modelId) {
@@ -227,22 +320,32 @@ export function resolveModelMetadata(modelId: string): ModelMetadata {
     return KNOWN_MODELS[modelId];
   }
 
-  // 2. Normalized lowercase match
-  const lower = modelId.toLowerCase();
+  // 2. Normalized lowercase & stripped match
+  const lower = modelId.toLowerCase().replace(/:free$/i, '');
   for (const [key, meta] of Object.entries(KNOWN_MODELS)) {
-    if (lower === key.toLowerCase() || lower.endsWith(`/${key.toLowerCase()}`)) {
+    const normKey = key.toLowerCase();
+    if (lower === normKey || lower.endsWith(`/${normKey}`) || normKey.endsWith(`/${lower}`)) {
       return { ...meta, id: modelId };
     }
   }
 
-  // 3. Heuristic pattern matching based on provider/family
-  if (lower.includes('gemini-1.5-pro') || lower.includes('gemini-2.0-pro')) {
+  // 3. Dynamic token pattern extraction from model name/ID (e.g. "2m", "1m", "200k", "128k", "64k")
+  const tokenMatch = lower.match(/(?:^|[^a-z0-9])(\d+)(k|m)(?:$|[^a-z0-9])/i);
+  let detectedContext: string | undefined;
+  if (tokenMatch && tokenMatch[1] && tokenMatch[2]) {
+    const num = tokenMatch[1];
+    const unit = tokenMatch[2].toUpperCase();
+    detectedContext = `${num}${unit === 'M' ? 'M' : 'k'}`;
+  }
+
+  // 4. Heuristic pattern matching based on provider/family
+  if (lower.includes('gemini-1.5-pro') || lower.includes('gemini-2.0-pro') || lower.includes('gemini-2.5-pro')) {
     return {
       id: modelId,
       name: formatModelName(modelId),
       provider: 'Google',
-      contextWindow: '2M',
-      tag: 'Ultra-Long Context (2M)',
+      contextWindow: detectedContext || '2M',
+      tag: 'Ultra-Long 2M Tokens Repo Context',
       tier: 'flagship',
     };
   }
@@ -251,38 +354,38 @@ export function resolveModelMetadata(modelId: string): ModelMetadata {
       id: modelId,
       name: formatModelName(modelId),
       provider: 'Google',
-      contextWindow: '1M',
-      tag: '1M Tokens Multimodal',
+      contextWindow: detectedContext || '1M',
+      tag: '1M Tokens Multimodal & Speed',
       tier: 'standard',
     };
   }
-  if (lower.includes('claude-3-5') || lower.includes('sonnet') || lower.includes('haiku') || lower.includes('opus')) {
+  if (lower.includes('minimax') || lower.includes('m3.1')) {
+    return {
+      id: modelId,
+      name: formatModelName(modelId),
+      provider: 'MiniMax',
+      contextWindow: detectedContext || '1M',
+      tag: 'Ultra-Long 1M Context Window',
+      tier: 'free',
+    };
+  }
+  if (lower.includes('longcat')) {
+    return {
+      id: modelId,
+      name: formatModelName(modelId),
+      provider: 'Meituan',
+      contextWindow: detectedContext || '1M',
+      tag: '1M Long Context Reasoning',
+      tier: 'free',
+    };
+  }
+  if (lower.includes('claude') || lower.includes('sonnet') || lower.includes('haiku') || lower.includes('opus')) {
     return {
       id: modelId,
       name: formatModelName(modelId),
       provider: 'Anthropic',
-      contextWindow: '200k',
+      contextWindow: detectedContext || '200k',
       tag: 'SOTA Coding & Tool Use',
-      tier: 'flagship',
-    };
-  }
-  if (lower.includes('deepseek-r1') || lower.includes('reasoner')) {
-    return {
-      id: modelId,
-      name: formatModelName(modelId),
-      provider: 'DeepSeek',
-      contextWindow: '128k',
-      tag: 'Deep Reasoning CoT',
-      tier: 'flagship',
-    };
-  }
-  if (lower.includes('deepseek')) {
-    return {
-      id: modelId,
-      name: formatModelName(modelId),
-      provider: 'DeepSeek',
-      contextWindow: '128k',
-      tag: 'High-Speed Coding & Logic',
       tier: 'flagship',
     };
   }
@@ -291,7 +394,7 @@ export function resolveModelMetadata(modelId: string): ModelMetadata {
       id: modelId,
       name: formatModelName(modelId),
       provider: 'OpenAI',
-      contextWindow: '200k',
+      contextWindow: detectedContext || '200k',
       tag: 'Advanced Math & Code',
       tier: 'flagship',
     };
@@ -301,38 +404,98 @@ export function resolveModelMetadata(modelId: string): ModelMetadata {
       id: modelId,
       name: formatModelName(modelId),
       provider: 'OpenAI',
-      contextWindow: '128k',
+      contextWindow: detectedContext || '128k',
       tag: 'Omni Reasoning & Logic',
       tier: 'flagship',
     };
   }
-  if (lower.includes('qwen') || lower.includes('llama') || lower.includes('mistral')) {
+  if (lower.includes('deepseek-r1') || lower.includes('reasoner')) {
     return {
       id: modelId,
       name: formatModelName(modelId),
-      provider: 'Open Weights',
-      contextWindow: '128k',
+      provider: 'DeepSeek',
+      contextWindow: detectedContext || '128k',
+      tag: 'Deep Reasoning CoT',
+      tier: 'flagship',
+    };
+  }
+  if (lower.includes('deepseek')) {
+    return {
+      id: modelId,
+      name: formatModelName(modelId),
+      provider: 'DeepSeek',
+      contextWindow: detectedContext || '128k',
+      tag: 'High-Speed Coding & Logic',
+      tier: 'flagship',
+    };
+  }
+  if (lower.includes('qwen')) {
+    return {
+      id: modelId,
+      name: formatModelName(modelId),
+      provider: 'Alibaba',
+      contextWindow: detectedContext || '128k',
+      tag: 'Open-Weights Coding Champion',
+      tier: 'standard',
+    };
+  }
+  if (lower.includes('glm')) {
+    return {
+      id: modelId,
+      name: formatModelName(modelId),
+      provider: 'Zhipu AI',
+      contextWindow: detectedContext || '128k',
+      tag: 'High Concurrency Coding',
+      tier: 'free',
+    };
+  }
+  if (lower.includes('nemotron')) {
+    return {
+      id: modelId,
+      name: formatModelName(modelId),
+      provider: 'NVIDIA',
+      contextWindow: detectedContext || '128k',
+      tag: 'NVIDIA Hardware Accelerated',
+      tier: 'free',
+    };
+  }
+  if (lower.includes('codestral') || lower.includes('mistral')) {
+    return {
+      id: modelId,
+      name: formatModelName(modelId),
+      provider: 'Mistral AI',
+      contextWindow: detectedContext || (lower.includes('codestral') ? '256k' : '128k'),
+      tag: 'Fast Code Generation',
+      tier: 'standard',
+    };
+  }
+  if (lower.includes('llama')) {
+    return {
+      id: modelId,
+      name: formatModelName(modelId),
+      provider: 'Meta',
+      contextWindow: detectedContext || '128k',
       tag: 'Open-Source Architecture',
       tier: 'standard',
     };
   }
-  if (lower.includes('free') || lower.includes('space-bunny') || lower.includes('longcat') || lower.includes('mimo')) {
+  if (lower.includes('free') || lower.includes('space-bunny') || lower.includes('beam') || lower.includes('mimo')) {
     return {
       id: modelId,
       name: formatModelName(modelId),
       provider: 'OpenCode Free',
-      contextWindow: '128k',
+      contextWindow: detectedContext || '128k',
       tag: 'Community Free Model',
       tier: 'free',
     };
   }
 
-  // 4. Safe fallback
+  // 5. Safe fallback
   return {
     id: modelId,
     name: formatModelName(modelId),
     provider: 'AI Provider',
-    contextWindow: '128k',
+    contextWindow: detectedContext || '128k',
     tag: 'General Intelligence',
   };
 }

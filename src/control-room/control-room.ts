@@ -26,6 +26,23 @@ import { SecurityPolicy } from '../security/policy.js';
 import { ConfigManager } from '../config/config-manager.js';
 import { t } from '../i18n/index.js';
 import { resolveModelMetadata, getStandardModelCatalog, KNOWN_MODELS } from '../domain/model-catalog.js';
+import {
+  buildModelsMenuView,
+  buildSkillsMenuView,
+  buildAgentsMenuView,
+  buildModeMenuView,
+  buildSessionsMenuView,
+  buildLanguageMenuView,
+  buildWorkspaceMenuView,
+  buildMentionsHubView,
+  renderMissionCard,
+  renderBusyTaskCard,
+  renderIdleStatusCard,
+  renderPresenceWelcomeCard,
+  renderSystemStatusReport,
+  renderUsageReport,
+  renderHandoffReport,
+} from './views/index.js';
 import type {
   ExecutionMode,
   InlineKeyboardMarkup,
@@ -311,27 +328,11 @@ export class ControlRoom {
 
     if (isTaskStatusInquiry || isPresenceInquiry) {
       if (this.activeRun && this.activeRun.busy) {
-        const elapsed = Math.round((Date.now() - this.activeRun.startedAt) / 1000);
-        const promptSnippet = this.activeRun.prompt ? escapeHtml(this.activeRun.prompt.slice(0, 150)) : '';
-        const activeCmd = this.activeRun.currentCommand
-          ? `<code>${escapeHtml(this.activeRun.currentCommand.slice(0, 150))}</code>`
-          : (isAr ? '<i>🧠 جاري التفكير ومعالجة الأكواد...</i>' : '<i>🧠 Thinking & processing code...</i>');
-
-        const busyCard = isAr
-          ? `⏳ <b>المهمة قيد التشغيل حالياً! (لا تقم بإعادة إرسال البرومت الآن)</b>\n\n` +
-            (promptSnippet ? `📝 <b>الطلب:</b> <code>${promptSnippet}</code>\n` : '') +
-            `⚙️ <b>النشاط الحالي:</b> ${activeCmd}\n` +
-            `🤖 <b>الموديل:</b> <code>${escapeHtml(this.currentModel)}</code>\n` +
-            `⏱️ <b>المدة المنقضية:</b> ⏳ ${elapsed} ثانية\n` +
-            `📊 <b>الأوامر المنفذة:</b> ⚙️ ${this.activeRun.cmds} · 📝 ${this.activeRun.files.size} ملفات\n\n` +
-            `💡 <i>الموديل مستمر بالعمل وسيرسل لك الجواب فور الانتهاء مباشرة!</i>`
-          : `⏳ <b>Task is actively executing! (Do not re-run yet)</b>\n\n` +
-            (promptSnippet ? `📝 <b>Prompt:</b> <code>${promptSnippet}</code>\n` : '') +
-            `⚙️ <b>Active Action:</b> ${activeCmd}\n` +
-            `🤖 <b>Model:</b> <code>${escapeHtml(this.currentModel)}</code>\n` +
-            `⏱️ <b>Elapsed:</b> ⏳ ${elapsed}s\n` +
-            `📊 <b>Progress:</b> ⚙️ ${this.activeRun.cmds} commands · 📝 ${this.activeRun.files.size} files\n\n` +
-            `💡 <i>Execution is underway and full results will be delivered automatically.</i>`;
+        const busyCard = renderBusyTaskCard({
+          run: this.activeRun,
+          currentModel: this.currentModel,
+          isAr,
+        });
 
         await this.channel.sendMessage(this.allowedChatId, busyCard, {
           replyToMessageId: msg.id,
@@ -357,32 +358,16 @@ export class ControlRoom {
         if (b.status === 0) branch = b.stdout.trim() || 'main';
       } catch {}
 
-      const curMeta = resolveModelMetadata(this.currentModel);
-
       if (isTaskStatusInquiry && !isPresenceInquiry) {
-        const lastPromptSnippet = this.lastPrompt ? escapeHtml(this.lastPrompt.slice(0, 140)) : '';
-        const lastTime = this.lastExecutionElapsed > 0 ? `${this.lastExecutionElapsed}s` : 'سريعاً';
-        const lastStatus = this.lastExecutionSuccess ? '✅ انتهت بنجاح' : '❌ فشلت أو تم إيقافها';
-
-        const idleCard = isAr
-          ? `🟢 <b>النظام متصل وفي وضع الاستعداد (Idle) — لا توجد مهمة قيد التشغيل حالياً</b> ⚡\n\n` +
-            (this.lastPrompt
-              ? `📋 <b>آخر طلب نُفّذ:</b> <code>${lastPromptSnippet}</code>\n` +
-                `🏁 <b>النتيجة:</b> ${lastStatus} (استغرقت ⏳ ${lastTime})\n\n`
-              : '') +
-            `📁 <b>المشروع:</b> <code>${escapeHtml(path.basename(this.targetDir))}</code>\n` +
-            `🌿 <b>فرع Git:</b> <code>${escapeHtml(branch)}</code>\n` +
-            `🧠 <b>الموديل:</b> <code>${escapeHtml(curMeta.name)}</code> (${escapeHtml(curMeta.contextWindow)})\n\n` +
-            `💡 <b>الجواب لسؤالك:</b> نعم، يمكنك إرسال أي برومت جديد الآن أو إعادة تشغيل أي طلب، النظام جاهز تماماً!`
-          : `🟢 <b>Online and Idle — No task is currently executing</b> ⚡\n\n` +
-            (this.lastPrompt
-              ? `📋 <b>Last executed task:</b> <code>${lastPromptSnippet}</code>\n` +
-                `🏁 <b>Status:</b> ${lastStatus} (took ⏳ ${lastTime})\n\n`
-              : '') +
-            `📁 <b>Workspace:</b> <code>${escapeHtml(path.basename(this.targetDir))}</code>\n` +
-            `🌿 <b>Git Branch:</b> <code>${escapeHtml(branch)}</code>\n` +
-            `🧠 <b>Active Model:</b> <code>${escapeHtml(curMeta.name)}</code> (${escapeHtml(curMeta.contextWindow)})\n\n` +
-            `💡 <b>Answer:</b> System is ready. You can safely send a new prompt or re-run any command now!`;
+        const idleCard = renderIdleStatusCard({
+          targetDir: this.targetDir,
+          branch,
+          currentModel: this.currentModel,
+          lastPrompt: this.lastPrompt,
+          lastExecutionElapsed: this.lastExecutionElapsed,
+          lastExecutionSuccess: this.lastExecutionSuccess,
+          isAr,
+        });
 
         await this.channel.sendMessage(this.allowedChatId, idleCard, {
           replyToMessageId: msg.id,
@@ -391,27 +376,13 @@ export class ControlRoom {
         return;
       }
 
-      const statusCard = isAr
-        ? `🟢 <b>أهلاً بك! نعم، أنا أعمل حياً ومتصل بالسيرفر بنجاح!</b> ⚡\n\n` +
-          `📁 <b>المشروع:</b> <code>${escapeHtml(path.basename(this.targetDir))}</code>\n` +
-          `🌿 <b>فرع Git:</b> <code>${escapeHtml(branch)}</code>\n` +
-          `🧠 <b>الموديل:</b> <code>${escapeHtml(curMeta.name)}</code> (سياق: <code>${escapeHtml(curMeta.contextWindow)}</code>)\n` +
-          `🧰 <b>المهارة النشطة:</b> <code>${escapeHtml(this.activeSkill || 'عامة')}</code>\n` +
-          `💻 <b>بيئة العمل:</b> Linux VPS (141.253.114.101)\n\n` +
-          `<b>جاهز لتنفيذ طلباتك:</b>\n` +
-          `• اضغط <b>/</b> لاختيار المهارات السريعة (مثل <code>/pinpoint_go</code> أو <code>/frontend</code>).\n` +
-          `• اكتب أي أمر طرفية مباشر (مثل <code>git status</code> أو <code>free -m</code>).\n` +
-          `• استخدم الأزرار أدناه للتحكم الشامل.`
-        : `🟢 <b>Yes, I am online, active, and fully connected to the server!</b> ⚡\n\n` +
-          `📁 <b>Workspace:</b> <code>${escapeHtml(path.basename(this.targetDir))}</code>\n` +
-          `🌿 <b>Git Branch:</b> <code>${escapeHtml(branch)}</code>\n` +
-          `🧠 <b>Active Model:</b> <code>${escapeHtml(curMeta.name)}</code> (${escapeHtml(curMeta.contextWindow)})\n` +
-          `🧰 <b>Active Skill:</b> <code>${escapeHtml(this.activeSkill || 'General')}</code>\n` +
-          `💻 <b>Environment:</b> Linux VPS (141.253.114.101)\n\n` +
-          `<b>Ready to assist:</b>\n` +
-          `• Type <b>/</b> to autocomplete skills (like <code>/pinpoint_go</code> or <code>/frontend</code>).\n` +
-          `• Enter direct shell commands (e.g. <code>git status</code> or <code>free -m</code>).\n` +
-          `• Use the mission control buttons below.`;
+      const statusCard = renderPresenceWelcomeCard({
+        targetDir: this.targetDir,
+        branch,
+        currentModel: this.currentModel,
+        activeSkill: this.activeSkill,
+        isAr,
+      });
 
       await this.channel.sendMessage(this.allowedChatId, statusCard, {
         replyToMessageId: msg.id,
@@ -1516,37 +1487,13 @@ export class ControlRoom {
   }
 
   private renderMissionCardText(): string {
-    const run = this.activeRun;
-    if (!run) return '⚡ <b>AgentGram Mission Control</b>\nStatus: Idle';
-
-    const elapsed = Math.round((Date.now() - run.startedAt) / 1000);
-    const statusIcon = run.done ? '🏁' : run.busy ? '🟢' : '⏸';
-    const statusText = run.done ? 'Finished' : run.busy ? 'Executing' : 'Waiting';
-    const curMeta = resolveModelMetadata(this.currentModel);
-
-    let card = `
-⚡ <b>AgentGram · Live Mission Control</b>
-Model: 🤖 <b>${escapeHtml(curMeta.name)}</b> (<code>${escapeHtml(curMeta.contextWindow)}</code>)
-Agent: 🧠 <code>${escapeHtml(run.agent)}</code> (${escapeHtml(this.engine.name)}) | Mode: 🔒 <b>${run.mode}</b>
-Channel: 📡 <b>${escapeHtml(this.channel.name)}</b>
-Status: ${statusIcon} <b>${statusText}</b> · ⏳ ${elapsed}s
-Commands: ⚙️ ${run.cmds} · Files: 📝 ${run.files.size}
-Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
-`.trim();
-
-    if (run.prompt) {
-      card += `\n\n📝 <b>Prompt:</b>\n<code>${escapeHtml(run.prompt.slice(0, 150))}</code>`;
-    }
-
-    if (run.currentCommand && run.busy) {
-      card += `\n\n⚙️ <b>Active Action:</b>\n<code>${escapeHtml(run.currentCommand.slice(0, 120))}</code>`;
-    }
-
-    if (run.recentOutput && run.busy) {
-      card += `\n\n📋 <b>Live Stream:</b>\n<pre><code>${escapeHtml(run.recentOutput.slice(-300))}</code></pre>`;
-    }
-
-    return card;
+    return renderMissionCard({
+      run: this.activeRun,
+      currentModel: this.currentModel,
+      engineName: this.engine.name,
+      channelName: this.channel.name,
+      targetDir: this.targetDir,
+    });
   }
 
   private async updateMissionCard(final = false): Promise<void> {
@@ -1628,24 +1575,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
   }
 
   private async sendAgentsMenu(editMsgId?: string | number): Promise<void> {
-    const agents = ['build', 'delegate', 'explorer', 'code-review'];
-    const rows: InlineKeyboardButton[][] = [];
-    let currentRow: InlineKeyboardButton[] = [];
-    for (const a of agents) {
-      const isCurrent = a === this.currentAgent;
-      currentRow.push({
-        text: `${isCurrent ? '● ' : ''}${a}`,
-        callback_data: `ag:${a}`,
-      });
-      if (currentRow.length === 2) {
-        rows.push(currentRow);
-        currentRow = [];
-      }
-    }
-    if (currentRow.length > 0) rows.push(currentRow);
-    rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:home' }]);
-
-    const text = t('select_agent', this.language, { agent: escapeHtml(this.currentAgent) });
+    const { text, rows } = buildAgentsMenuView(this.currentAgent, this.language);
     if (editMsgId !== undefined) {
       try {
         await this.channel.editMessage(
@@ -1680,62 +1610,20 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
     const allModels = Array.from(combinedSet);
     this.modelRegistryList = allModels;
 
-    const rest = allModels.filter((m) => !favs.includes(m));
-    const pageSize = 6;
-    const pool = page === 0 ? favs : rest.slice((page - 1) * pageSize, page * pageSize);
-    const totalPages = Math.ceil(rest.length / pageSize) || 1;
-
-    const rows: InlineKeyboardButton[][] = pool.map((m) => {
-      const meta = resolveModelMetadata(m);
-      const isCurrent = m === this.currentModel;
-      const cleanName = meta.name.length > 20 ? meta.name.slice(0, 18) + '…' : meta.name;
-      const globalIdx = allModels.indexOf(m);
-      return [
-        {
-          text: `${isCurrent ? '● ' : ''}${cleanName} · ${meta.contextWindow}`,
-          callback_data: `md:${globalIdx >= 0 ? globalIdx : 0}`,
-        },
-      ];
+    const { text, rows } = buildModelsMenuView({
+      allModels,
+      favoriteModels: favs,
+      currentModel: this.currentModel,
+      page,
+      language: this.language,
     });
-
-    if (page === 0) {
-      if (rest.length > 0) {
-        rows.push([{ text: t('btn_all_models', this.language), callback_data: 'pg:1' }]);
-      }
-      rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:home' }]);
-    } else {
-      const pagRow: InlineKeyboardButton[] = [
-        { text: t('btn_favorites', this.language), callback_data: 'pg:0' },
-      ];
-      if (rest.length > page * pageSize) {
-        pagRow.push({ text: t('btn_next', this.language), callback_data: `pg:${page + 1}` });
-      }
-      rows.push(pagRow);
-      rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:md' }]);
-    }
-
-    const curMeta = resolveModelMetadata(this.currentModel);
-    let cardText = this.language === 'ar'
-      ? `🤖 <b>نماذج الذكاء الاصطناعي ومساحة السياق</b> ${page > 0 ? `(صفحة ${page} من ${totalPages})` : '(المفضلة)'}\nالنموذج النشط: <b>${escapeHtml(curMeta.name)}</b> (<code>${escapeHtml(curMeta.contextWindow)}</code>)\n\n`
-      : `🤖 <b>AI Models & Context Windows</b> ${page > 0 ? `(Page ${page} of ${totalPages})` : '(Favorites)'}\nActive: <b>${escapeHtml(curMeta.name)}</b> (<code>${escapeHtml(curMeta.contextWindow)}</code>)\n\n`;
-
-    for (const m of pool) {
-      const meta = resolveModelMetadata(m);
-      const isCurrent = m === this.currentModel;
-      cardText += `${isCurrent ? '●' : '•'} <b>${escapeHtml(meta.name)}</b> (<code>${escapeHtml(meta.provider)}</code>)\n`;
-      cardText += `  <code>السياق: ${escapeHtml(meta.contextWindow)} | ${escapeHtml(meta.tag)}</code>\n`;
-    }
-
-    cardText += this.language === 'ar'
-      ? `\n<i>اضغط على أي نموذج أدناه للتبديل إليه فوراً:</i>`
-      : `\n<i>Tap any model below to activate immediately:</i>`;
 
     if (editMsgId !== undefined) {
       try {
         await this.channel.editMessage(
           this.allowedChatId,
           editMsgId,
-          cardText.trim(),
+          text,
           { replyMarkup: this.wrapKeyboard(rows) }
         );
         return;
@@ -1744,24 +1632,13 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
 
     await this.channel.sendMessage(
       this.allowedChatId,
-      cardText.trim(),
+      text,
       { replyMarkup: this.wrapKeyboard(rows) }
     );
   }
 
   private async sendModeMenu(editMsgId?: string | number): Promise<void> {
-    const rows: InlineKeyboardButton[][] = [
-      [
-        { text: `${this.currentMode === 'read' ? '● ' : ''}🔒 Read-Only`, callback_data: 'mo:read' },
-        { text: `${this.currentMode === 'build' ? '● ' : ''}🔨 Build (Interactive)`, callback_data: 'mo:build' },
-        { text: `${this.currentMode === 'auto' ? '● ' : ''}⚡ Auto Mode`, callback_data: 'mo:auto' },
-      ],
-      [
-        { text: t('btn_back', this.language), callback_data: 'menu:home' },
-      ],
-    ];
-
-    const text = t('select_mode', this.language, { mode: this.currentMode });
+    const { text, rows } = buildModeMenuView(this.currentMode, this.language);
     if (editMsgId !== undefined) {
       try {
         await this.channel.editMessage(
@@ -1782,18 +1659,7 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
   }
 
   private async sendSessionsMenu(editMsgId?: string | number): Promise<void> {
-    const rows: InlineKeyboardButton[][] = [
-      [{ text: '✨ ' + t('btn_new', this.language), callback_data: 'new' }],
-    ];
-    if (this.activeRun && this.activeRun.sessionId) {
-      rows.unshift([{
-        text: `● Session: ${this.activeRun.sessionId.slice(0, 16)}…`,
-        callback_data: `se:${this.activeRun.sessionId}`,
-      }]);
-    }
-    rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:home' }]);
-
-    const text = `📂 <b>Active Sessions</b>\nCurrent: <code>${escapeHtml(this.activeRun?.sessionId || 'None (New)')}</code>`;
+    const { text, rows } = buildSessionsMenuView(this.activeRun?.sessionId, this.language);
     if (editMsgId !== undefined) {
       try {
         await this.channel.editMessage(
@@ -1834,31 +1700,27 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       }
     } catch {}
 
-    const isBusy = this.activeRun && this.activeRun.busy ? '🟢 Running' : '⏸ Idle';
-    let text = `
-📊 <b>System & Mission Control Status</b>
-📁 Workspace: <b>${escapeHtml(path.basename(this.targetDir))}</b>
-<code>${escapeHtml(this.targetDir)}</code>
-🧠 Agent: <b>${escapeHtml(this.currentAgent)}</b> (${escapeHtml(this.engine.name)})
-🤖 Model: <b>${escapeHtml(this.currentModel || 'Default')}</b>
-🔒 Mode: <b>${escapeHtml(this.currentMode)}</b>
-📡 Channel: <b>${escapeHtml(this.channel.name)}</b>
-📂 Session: <code>${escapeHtml(this.activeRun?.sessionId || 'None (Ready)')}</code>
-⏳ Status: <b>${isBusy}</b>
-🌿 Git Branch: <code>${escapeHtml(branch)}</code> · Modified files: <b>${dirtyCount}</b>
-`.trim();
-
-    if (this.activeRun && this.activeRun.busy) {
-      const elapsed = Math.round((Date.now() - this.activeRun.startedAt) / 1000);
-      text += `\n\n⚙️ <b>Current Execution:</b>\n`;
-      if (this.activeRun.prompt) {
-        text += `• Prompt: <code>${escapeHtml(this.activeRun.prompt.slice(0, 140))}</code>\n`;
-      }
-      text += `• Elapsed: ⏳ ${elapsed}s\n`;
-      text += `• Actions: ⚙️ ${this.activeRun.cmds} commands · 📝 ${this.activeRun.files.size} files`;
-    } else if (this.lastPrompt) {
-      text += `\n\n📋 <b>Last Task:</b>\n<code>${escapeHtml(this.lastPrompt.slice(0, 140))}</code>\n• Status: ${this.lastExecutionSuccess ? '✅ Finished' : '❌ Failed/Stopped'} (${this.lastExecutionElapsed}s)`;
-    }
+    const text = renderSystemStatusReport({
+      targetDir: this.targetDir,
+      currentAgent: this.currentAgent,
+      engineName: this.engine.name,
+      currentModel: this.currentModel,
+      currentMode: this.currentMode,
+      channelName: this.channel.name,
+      sessionId: this.activeRun?.sessionId,
+      isBusy: !!(this.activeRun && this.activeRun.busy),
+      branch,
+      dirtyCount,
+      activeRun: this.activeRun && this.activeRun.busy ? {
+        startedAt: this.activeRun.startedAt,
+        prompt: this.activeRun.prompt,
+        cmds: this.activeRun.cmds,
+        filesCount: this.activeRun.files.size,
+      } : undefined,
+      lastPrompt: this.lastPrompt,
+      lastExecutionSuccess: this.lastExecutionSuccess,
+      lastExecutionElapsed: this.lastExecutionElapsed,
+    });
 
     await this.channel.sendMessage(this.allowedChatId, text, {
       replyMarkup: this.getMainKeyboard(),
@@ -1974,62 +1836,19 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
 
   public async sendSkillsMenu(page = 0, editMsgId?: string | number): Promise<void> {
     const allSkills = this.getAllAvailableSkills();
-    const pageSize = 8;
-    const totalPages = Math.ceil(allSkills.length / pageSize) || 1;
-    const safePage = Math.min(Math.max(0, page), totalPages - 1);
-    const pool = allSkills.slice(safePage * pageSize, (safePage + 1) * pageSize);
-
-    const rows: InlineKeyboardButton[][] = [];
-    let currentRow: InlineKeyboardButton[] = [];
-    for (const sk of pool) {
-      const isCurrent = sk.name === this.activeSkill;
-      currentRow.push({
-        text: `${isCurrent ? '● ' : ''}🧰 ${sk.name}`,
-        callback_data: `sk:${sk.name}`,
-      });
-      if (currentRow.length === 2) {
-        rows.push(currentRow);
-        currentRow = [];
-      }
-    }
-    if (currentRow.length > 0) rows.push(currentRow);
-
-    // Pagination row
-    const pagRow: InlineKeyboardButton[] = [];
-    if (safePage > 0) {
-      pagRow.push({ text: '⬅️ السابق', callback_data: `skpage:${safePage - 1}` });
-    }
-    if (safePage < totalPages - 1) {
-      pagRow.push({ text: '➡️ المزيد من المهارات', callback_data: `skpage:${safePage + 1}` });
-    }
-    if (pagRow.length > 0) {
-      rows.push(pagRow);
-    }
-
-    // Dedicated back button row
-    rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:home' }]);
-
-    let cardText = this.language === 'ar'
-      ? `🧰 <b>مهارات وكلاء الذكاء الاصطناعي (Agent Skills)</b> (صفحة ${safePage + 1} من ${totalPages} · إجمالي ${allSkills.length} مهارة)\nالمهارة المفعلة: <b>${escapeHtml(this.activeSkill || 'بدون (وكيل عام)')}</b>\n\n`
-      : `🧰 <b>Available Agent Skills</b> (Page ${safePage + 1} of ${totalPages} · Total: ${allSkills.length})\nActive: <b>${escapeHtml(this.activeSkill || 'None (Standard Agent)')}</b>\n\n`;
-
-    for (const sk of pool) {
-      const isCurrent = sk.name === this.activeSkill;
-      const descSnippet = sk.description ? sk.description.slice(0, 60) + (sk.description.length > 60 ? '…' : '') : 'مهارة متخصصة';
-      cardText += `${isCurrent ? '●' : '•'} <b>${escapeHtml(sk.name)}</b>\n`;
-      cardText += `  <code>${escapeHtml(descSnippet)}</code>\n`;
-    }
-
-    cardText += this.language === 'ar'
-      ? `\n<i>اختر المهارة لتوجيه الوكيل البرمجي للعمل بها فوراً:</i>`
-      : `\n<i>Select a skill to prime the agent for execution:</i>`;
+    const { text, rows } = buildSkillsMenuView({
+      skills: allSkills,
+      activeSkill: this.activeSkill,
+      page,
+      language: this.language,
+    });
 
     if (editMsgId !== undefined) {
       try {
         await this.channel.editMessage(
           this.allowedChatId,
           editMsgId,
-          cardText.trim(),
+          text,
           { replyMarkup: this.wrapKeyboard(rows) }
         );
         return;
@@ -2038,98 +1857,27 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
 
     await this.channel.sendMessage(
       this.allowedChatId,
-      cardText.trim(),
+      text,
       { replyMarkup: this.wrapKeyboard(rows) }
     );
   }
 
   public async sendMentionsHub(editMsgId?: string | number): Promise<void> {
-    const isAr = this.language === 'ar';
-
-    const card = isAr
-      ? `⚡ <b>مركز المنشن والاختصارات السريعة (@)</b>\n\n` +
-        `اختر ما يناسبك أدناه أو اكتب في الشات <code>@name</code> مباشرة:\n\n` +
-        `🧰 <b>المهارات السريعة (Skills):</b>\n` +
-        `• <code>@pinpoint_go</code> — نشر وفحص Pinpoint Ops على السيرفر\n` +
-        `• <code>@frontend</code> — حوكمة Vue 3 / Inertia / Admin-Vue\n` +
-        `• <code>@erp_debug</code> — تدقيق ERP والقيود المزدوجة\n` +
-        `• <code>@query_perf</code> — فحص أداء الاستعلامات والفهارس\n\n` +
-        `🧠 <b>الموديلات وسياق الذاكرة (Models):</b>\n` +
-        `• <code>@claude</code> — Claude 3.5 Sonnet (200k)\n` +
-        `• <code>@gemini</code> — Gemini 2.0 Flash (1M)\n` +
-        `• <code>@gpt4o</code> — GPT-4o (128k)\n` +
-        `• <code>@deepseek</code> — DeepSeek Chat (128k)\n\n` +
-        `🤖 <b>الأيجنتس (Agents):</b>\n` +
-        `• <code>@build</code> — مهندس التنفيذ المباشر\n` +
-        `• <code>@plan</code> — التخطيط والتحليل المعماري\n` +
-        `• <code>@review</code> — مراجعة وتدقيق الجودة\n\n` +
-        `<i>💡 نصيحة: يمكنك كتابة <code>@frontend ظبط أزرار المودال</code> أو <code>@plan خطط للميزة</code></i>`
-      : `⚡ <b>Mentions & Instant Shortcuts Hub (@)</b>\n\n` +
-        `Select from below or type <code>@name</code> directly in chat:\n\n` +
-        `🧰 <b>Governed Skills:</b>\n` +
-        `• <code>@pinpoint_go</code> — Run Pinpoint Ops test, deploy & status\n` +
-        `• <code>@frontend</code> — Vue 3 / Inertia / Admin-Vue design laws\n` +
-        `• <code>@erp_debug</code> — ERP double-entry & ledger diagnostics\n` +
-        `• <code>@query_perf</code> — Query performance & index audit\n\n` +
-        `🧠 <b>AI Models & Context Window:</b>\n` +
-        `• <code>@claude</code> — Claude 3.5 Sonnet (200k)\n` +
-        `• <code>@gemini</code> — Gemini 2.0 Flash (1M)\n` +
-        `• <code>@gpt4o</code> — GPT-4o (128k)\n` +
-        `• <code>@deepseek</code> — DeepSeek Chat (128k)\n\n` +
-        `🤖 <b>Agents:</b>\n` +
-        `• <code>@build</code> — Primary code builder\n` +
-        `• <code>@plan</code> — Architecture & planning\n` +
-        `• <code>@review</code> — Quality & security review\n\n` +
-        `<i>💡 Tip: Prefix any prompt, e.g. <code>@frontend fix buttons</code> or <code>@plan design schema</code></i>`;
-
-    const rows: InlineKeyboardButton[][] = [
-      [
-        { text: isAr ? '🧰 كل المهارات' : '🧰 All Skills', callback_data: 'mention:skills' },
-        { text: isAr ? '🧠 كل الموديلات' : '🧠 All Models', callback_data: 'mention:models' },
-        { text: isAr ? '🤖 كل الأيجنتس' : '🤖 All Agents', callback_data: 'mention:agents' },
-      ],
-      [
-        { text: '🚀 @pinpoint_go', callback_data: 'mention:skill:pinpoint_go' },
-        { text: '🎨 @frontend', callback_data: 'mention:skill:frontend' },
-      ],
-      [
-        { text: '💼 @erp_debug', callback_data: 'mention:skill:erp_debug' },
-        { text: '⚡ @query_perf', callback_data: 'mention:skill:query_perf' },
-      ],
-      [
-        { text: '🧠 @claude', callback_data: 'mention:model:claude' },
-        { text: '🧠 @gemini', callback_data: 'mention:model:gemini' },
-        { text: '🧠 @gpt4o', callback_data: 'mention:model:gpt4o' },
-      ],
-      [
-        { text: '🤖 @build', callback_data: 'mention:agent:build' },
-        { text: '🤖 @plan', callback_data: 'mention:agent:plan' },
-        { text: '🤖 @review', callback_data: 'mention:agent:review' },
-      ],
-      [
-        {
-          text: isAr ? '🔍 البحث الحي بالمنشن (@)' : '🔍 Live Mentions Search (@)',
-          switch_inline_query_current_chat: '',
-        },
-      ],
-      [
-        { text: t('btn_back', this.language), callback_data: 'menu:home' },
-      ],
-    ];
+    const { text, rows } = buildMentionsHubView(this.language);
 
     if (editMsgId !== undefined) {
       try {
         await this.channel.editMessage(
           this.allowedChatId,
           editMsgId,
-          card,
+          text,
           { replyMarkup: this.wrapKeyboard(rows) }
         );
         return;
       } catch {}
     }
 
-    await this.channel.sendMessage(this.allowedChatId, card, {
+    await this.channel.sendMessage(this.allowedChatId, text, {
       replyMarkup: this.wrapKeyboard(rows),
     });
   }
@@ -2211,13 +1959,13 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
 
   private async sendUsageReport(): Promise<void> {
     const cfg = this.cfgManager.config;
-    const text = `
-📈 <b>Resource Usage & Quotas</b>
-• Daily Limit: <b>${cfg.dailyLimit} tasks</b>
-• Task Timeout: <b>${Math.round(cfg.runTimeout / 60)} minutes</b>
-• Workspace ID: <code>${escapeHtml(this.cfgManager.workspaceId)}</code>
-• Platform: <b>${os.platform()} (${os.arch()})</b>
-`.trim();
+    const text = renderUsageReport({
+      dailyLimit: cfg.dailyLimit,
+      runTimeoutMinutes: Math.round(cfg.runTimeout / 60),
+      workspaceId: this.cfgManager.workspaceId,
+      platform: os.platform(),
+      arch: os.arch(),
+    });
 
     await this.channel.sendMessage(this.allowedChatId, text, {
       replyMarkup: this.getMainKeyboard(),
@@ -2225,14 +1973,8 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
   }
 
   private async sendLanguageMenu(editMsgId?: string | number): Promise<void> {
-    const cur = this.language;
-    const rows: InlineKeyboardButton[][] = [
-      [{ text: `${cur === 'en' ? '● ' : ''}🇺🇸 English`, callback_data: 'lang:en' }],
-      [{ text: `${cur === 'ar' ? '● ' : ''}🇸🇦 العربية`, callback_data: 'lang:ar' }],
-      [{ text: t('btn_back', this.language), callback_data: 'menu:home' }],
-    ];
+    const { text, rows } = buildLanguageMenuView(this.language);
 
-    const text = t('select_language', this.language);
     if (editMsgId !== undefined) {
       try {
         await this.channel.editMessage(
@@ -2267,18 +2009,14 @@ Workspace: 📁 <code>${escapeHtml(path.basename(this.targetDir))}</code>
       if (c.status === 0) commits = c.stdout.trim().split('\n').filter(Boolean);
     } catch {}
 
-    const dirtyPreview = dirtyLines.slice(0, 10).map((l) => `  ${l}`).join('\n') || '  (Clean working tree)';
-    const commitsPreview = commits.map((c) => `  ${c}`).join('\n') || '  (No commits)';
-
-    const text = `
-<b>HANDOFF — Resume task in another tool</b>
-Repo: <code>${escapeHtml(this.targetDir)}</code> (Branch: <code>${escapeHtml(branch)}</code>)
-Uncommitted files: <b>${dirtyLines.length}</b>
-<pre><code>${escapeHtml(dirtyPreview)}</code></pre>
-Last commits:
-<pre><code>${escapeHtml(commitsPreview)}</code></pre>
-Agent: <b>${escapeHtml(this.currentAgent)}</b> | Mode: <b>${escapeHtml(this.currentMode)}</b>
-`.trim();
+    const text = renderHandoffReport({
+      targetDir: this.targetDir,
+      branch,
+      dirtyLines,
+      commits,
+      currentAgent: this.currentAgent,
+      currentMode: this.currentMode,
+    });
 
     await this.channel.sendMessage(this.allowedChatId, text, {
       replyMarkup: this.getMainKeyboard(),
@@ -2286,16 +2024,12 @@ Agent: <b>${escapeHtml(this.currentAgent)}</b> | Mode: <b>${escapeHtml(this.curr
   }
 
   private async sendWorkspaceMenu(editMsgId?: string | number): Promise<void> {
-    const workspaces = this.cfgManager.config.workspaces;
-    const rows: InlineKeyboardButton[][] = workspaces.map((ws, i) => [
-      {
-        text: `${ws === this.targetDir ? '👉 ' : ''}${path.basename(ws)}`,
-        callback_data: `ws:${i}`,
-      },
-    ]);
-    rows.push([{ text: t('btn_back', this.language), callback_data: 'menu:home' }]);
+    const { text, rows } = buildWorkspaceMenuView(
+      this.cfgManager.config.workspaces,
+      this.targetDir,
+      this.language
+    );
 
-    const text = t('select_workspace', this.language, { ws: escapeHtml(this.targetDir) });
     if (editMsgId !== undefined) {
       try {
         await this.channel.editMessage(
