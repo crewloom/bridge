@@ -20,6 +20,9 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
   private readonly boundEventHandler: (event: OpenCodeEvent) => void;
   private activeSessionId: string | null = null;
   private accumulatedText = '';
+  private accumulatedReasoning = '';
+  private lastUserPrompt = '';
+  private readonly assistantMsgIds = new Set<string>();
   private readonly finishedSessions = new Set<string>();
 
   constructor(clientOrUrl: OpenCodeClient | string, workspaceDir?: string) {
@@ -71,7 +74,15 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
       return;
     }
 
-    // 2. Tool execution and live output
+    // 2. Track message roles
+    if (type === 'message.updated') {
+      const info = (props.info || {}) as Record<string, unknown>;
+      if (info.role === 'assistant' && typeof info.id === 'string') {
+        this.assistantMsgIds.add(info.id);
+      }
+    }
+
+    // 3. Tool execution and live output
     if (type === 'message.part.updated') {
       const part = (props.part || {}) as Record<string, unknown>;
       const partType = String(part.type || '');
@@ -108,20 +119,26 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
           } as AgentEngineEvent);
         }
       } else if (partType === 'text') {
-        if (typeof part.text === 'string') {
+        if (typeof part.text === 'string' && part.text.trim() !== this.lastUserPrompt) {
           this.accumulatedText = part.text;
+        }
+      } else if (partType === 'reasoning') {
+        if (typeof part.text === 'string') {
+          this.accumulatedReasoning = part.text;
         }
       }
     }
 
-    // 3. Streaming text deltas
+    // 4. Streaming text and reasoning deltas
     if (type === 'message.part.delta') {
       if (props.field === 'text' && typeof props.delta === 'string') {
         this.accumulatedText += props.delta;
+      } else if (props.field === 'reasoning' && typeof props.delta === 'string') {
+        this.accumulatedReasoning += props.delta;
       }
     }
 
-    // 4. Session Error
+    // 5. Session Error
     if (type === 'session.error') {
       const errObj = (props.error || {}) as Record<string, unknown>;
       const dataObj = (errObj.data || {}) as Record<string, unknown>;
@@ -140,7 +157,7 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
       return;
     }
 
-    // 5. Session Idle / Completion
+    // 6. Session Idle / Completion
     const isStatusIdle =
       type === 'session.status' &&
       typeof props.status === 'object' &&
@@ -156,6 +173,7 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
             sessionID: sid,
             status: 'done',
             output: this.accumulatedText.trim(),
+            reasoning: this.accumulatedReasoning.trim(),
           },
         } as AgentEngineEvent);
       }
@@ -191,6 +209,8 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
   ): Promise<void> {
     this.activeSessionId = sessionId;
     this.accumulatedText = '';
+    this.accumulatedReasoning = '';
+    this.lastUserPrompt = prompt.trim();
     this.finishedSessions.delete(sessionId);
     await this.client.submitPrompt(sessionId, prompt, agent, model);
   }

@@ -165,10 +165,15 @@ export interface OpenCodeRun {
   cmds: number;
   busy: boolean;
   done: boolean;
+  prompt?: string | undefined;
+  currentActivity?: string | undefined;
+  assistantText?: string | undefined;
+  reasoningText?: string | undefined;
   error?: string | null | undefined;
   currentCommand?: string | undefined;
   recentOutput?: string | undefined;
   lastResultOutput?: string | undefined;
+  completionDelivered?: boolean | undefined;
 }
 
 export interface OpenCodePermissionRequest {

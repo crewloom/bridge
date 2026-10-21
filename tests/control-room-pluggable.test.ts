@@ -27,6 +27,7 @@ class MockChannelAdapter implements IChannelAdapter {
   public sentMessages: Array<{ recipientId: string; text: string; options?: ChannelSendOptions }> = [];
   public editedMessages: Array<{ messageId: string | number; text: string }> = [];
   public answeredActions: string[] = [];
+  public answeredActionTexts: Array<{ id: string; text?: string }> = [];
 
   public async startListening(_handler: ChannelUpdateHandler): Promise<void> {}
   public stopListening(): void {}
@@ -53,8 +54,9 @@ class MockChannelAdapter implements IChannelAdapter {
     this.editedMessages.push({ messageId, text });
   }
 
-  public async answerAction(actionId: string, _text?: string): Promise<void> {
+  public async answerAction(actionId: string, text?: string): Promise<void> {
     this.answeredActions.push(actionId);
+    this.answeredActionTexts.push({ id: actionId, text });
   }
 
   public registeredCommands: Array<{ command: string; description: string }> = [];
@@ -637,6 +639,138 @@ test('ControlRoom - handleInlineQuery returns matched skills, models, and agents
   const results = q1.results as any[];
   assert.ok(results.length > 0);
   assert.ok(results.some((r) => r.title.includes('frontend')));
+
+  room.stop();
+});
+
+test('ControlRoom - answers conversational task status inquiries accurately when busy and idle', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  cfg.config.language = 'ar';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  // 1. Idle status query
+  await (room as any).handleUserMessage({
+    id: 301,
+    chatId: '123456789',
+    senderId: '123456789',
+    text: 'عاوز اشوف حاله التاسك',
+    timestamp: Date.now(),
+  });
+
+  const idleMsg = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(idleMsg, 'Must reply to task status query while idle');
+  assert.ok(idleMsg.text.includes('لا توجد مهمة قيد التشغيل حالياً'), 'Must inform user that system is idle');
+  assert.ok(idleMsg.text.includes('يمكنك إرسال أي برومت جديد الآن'), 'Must clarify that user can send a new prompt');
+
+  // 2. Start active task
+  await room.guardedSubmit('تحديث نظام الحسابات وإضافة قيود اليومية');
+  assert.ok((room as any).activeRun?.busy);
+
+  // 3. Status query while busy
+  await (room as any).handleUserMessage({
+    id: 302,
+    chatId: '123456789',
+    senderId: '123456789',
+    text: 'يعني هل ارن البرومت تاني ولا هوا خلص اعرف دا ازاي',
+    timestamp: Date.now(),
+  });
+
+  const busyMsg = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(busyMsg, 'Must reply to inquiry while busy');
+  assert.ok(busyMsg.text.includes('المهمة قيد التشغيل حالياً'), 'Must state task is actively executing');
+  assert.ok(busyMsg.text.includes('لا تقم بإعادة إرسال البرومت الآن'), 'Must warn user NOT to re-run yet');
+  assert.ok(busyMsg.text.includes('تحديث نظام الحسابات'), 'Must include original prompt snippet');
+  assert.ok(busyMsg.options?.replyMarkup?.rows.some((r) => r.some((b) => b.callbackData === 'stop')));
+
+  room.stop();
+});
+
+test('ControlRoom - model switching updates in-place with short indexed callbacks and toast confirmation', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  cfg.config.language = 'ar';
+  cfg.config.favoriteModels = ['claude-3-5-sonnet', 'gemini-2.0-flash-exp', 'deepseek-chat'];
+  cfg.config.defaultModel = 'claude-3-5-sonnet';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  await room.sendModelsMenu(0);
+  const menuMsg = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(menuMsg);
+  const rows = menuMsg.options?.replyMarkup?.rows || [];
+
+  // All model callbackData must be short indexed strings (e.g. md:0, md:1), NEVER raw model IDs
+  const modelBtns = rows.flat().filter((b) => b.callbackData?.startsWith('md:'));
+  for (const btn of modelBtns) {
+    assert.ok(btn.callbackData && btn.callbackData.length <= 10, 'Model callbackData must be <= 10 bytes to prevent Telegram 400 error');
+  }
+
+  // Click on the second model (gemini-2.0-flash-exp)
+  await (room as any).handleCallback('cb-model-1', 'md:1', 12345);
+
+  assert.equal(room.currentModel, 'gemini-2.0-flash-exp', 'Must update currentModel');
+  assert.equal(cfg.config.defaultModel, 'gemini-2.0-flash-exp', 'Must persist defaultModel to config');
+
+  // Verify answerAction received a toast text
+  const lastToast = mockChan.answeredActionTexts[mockChan.answeredActionTexts.length - 1];
+  assert.ok(lastToast);
+  assert.equal(lastToast.id, 'cb-model-1');
+  assert.ok(lastToast.text?.includes('تم تفعيل'), 'Must show native activation toast');
+
+  // Verify in-place editMessage was called for message 12345
+  const edited = mockChan.editedMessages.find((m) => m.messageId === 12345);
+  assert.ok(edited, 'Must edit model menu in-place');
+  assert.ok(edited.text.includes('Gemini 2.0 Flash'), 'Edited menu must reflect new active model');
+
+  room.stop();
+});
+
+test('ControlRoom - delivers genuine assistant text and reasoning on step_finish with zero silence', async () => {
+  const cfg = new ConfigManager(process.cwd());
+  cfg.config.allowedChatId = '123456789';
+  cfg.config.language = 'ar';
+  const mockChan = new MockChannelAdapter();
+  const mockEng = new MockAgentEngine();
+
+  const room = new ControlRoom({
+    channel: mockChan,
+    engine: mockEng,
+    configManager: cfg,
+  });
+
+  await room.guardedSubmit('حلل ملفات المشروع');
+  const initialSentCount = mockChan.sentMessages.length;
+
+  // Emit step_finish with conversational assistant output and reasoning
+  mockEng.emit('event', {
+    type: 'step_finish',
+    properties: {
+      status: 'success',
+      output: 'تم فحص جميع ملفات المشروع بنجاح ووجدنا 3 تحسينات مطلوبة في واجهة المستخدم.',
+      reasoning: 'قمنا بمراجعة بنية مجلد src ومقارنتها بمعايير التصميم',
+    },
+  });
+
+  await new Promise((r) => setTimeout(r, 20));
+
+  assert.ok(mockChan.sentMessages.length > initialSentCount, 'Must deliver assistant reply message');
+  const finalReply = mockChan.sentMessages[mockChan.sentMessages.length - 1];
+  assert.ok(finalReply.text.includes('تم فحص جميع ملفات المشروع بنجاح'), 'Must contain the assistant answer');
+  assert.ok(finalReply.text.includes('تفكير الموديل') || finalReply.text.includes('Thinking'), 'Must include reasoning snippet');
 
   room.stop();
 });

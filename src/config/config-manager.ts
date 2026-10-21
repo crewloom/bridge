@@ -173,17 +173,40 @@ export class ConfigManager {
 
   public merge(data: Record<string, unknown>): void {
     if (typeof data.bot_token === 'string') this.config.botToken = data.bot_token.trim();
-    if (typeof data.allowed_chat_id === 'string') this.config.allowedChatId = String(data.allowed_chat_id).trim();
+    if (typeof data.botToken === 'string') this.config.botToken = data.botToken.trim();
+
+    if (typeof data.allowed_chat_id === 'string' || typeof data.allowed_chat_id === 'number') {
+      this.config.allowedChatId = String(data.allowed_chat_id).trim();
+    }
+    if (typeof data.allowedChatId === 'string' || typeof data.allowedChatId === 'number') {
+      this.config.allowedChatId = String(data.allowedChatId).trim();
+    }
+
     if (typeof data.default_agent === 'string') this.config.defaultAgent = data.default_agent.trim();
+    if (typeof data.defaultAgent === 'string') this.config.defaultAgent = data.defaultAgent.trim();
+
     if (typeof data.default_model === 'string') this.config.defaultModel = data.default_model.trim();
+    if (typeof data.defaultModel === 'string') this.config.defaultModel = data.defaultModel.trim();
+
     if (typeof data.channel === 'string') this.config.channel = data.channel.trim();
     if (typeof data.engine === 'string') this.config.engine = data.engine.trim();
+
     if (Array.isArray(data.favorite_models)) this.config.favoriteModels = data.favorite_models.map(String);
+    if (Array.isArray(data.favoriteModels)) this.config.favoriteModels = data.favoriteModels.map(String);
+
     if (typeof data.daily_limit === 'number') this.config.dailyLimit = data.daily_limit;
+    if (typeof data.dailyLimit === 'number') this.config.dailyLimit = data.dailyLimit;
+
     if (typeof data.run_timeout === 'number') this.config.runTimeout = data.run_timeout;
+    if (typeof data.runTimeout === 'number') this.config.runTimeout = data.runTimeout;
+
     if (data.language === 'ar' || data.language === 'en') this.config.language = data.language;
+
     if (Array.isArray(data.deny_patterns)) this.config.denyPatterns = data.deny_patterns.map(String);
+    if (Array.isArray(data.denyPatterns)) this.config.denyPatterns = data.denyPatterns.map(String);
+
     if (Array.isArray(data.allowed_paths)) this.config.allowedPaths = data.allowed_paths.map(String);
+    if (Array.isArray(data.allowedPaths)) this.config.allowedPaths = data.allowedPaths.map(String);
     if (Array.isArray(data.workspaces)) {
       this.config.workspaces = [];
       for (const w of data.workspaces) {

@@ -27,7 +27,7 @@ export function toTelegramMarkup(keyboard?: ChannelKeyboard): InlineKeyboardMark
     inline_keyboard: keyboard.rows.map((row) =>
       row.map((btn) => ({
         text: btn.text,
-        callback_data: btn.callbackData ?? undefined,
+        callback_data: btn.callbackData ?? (btn as unknown as Record<string, unknown>).callback_data as string ?? undefined,
         url: btn.url ?? undefined,
         switch_inline_query_current_chat: btn.switchInlineQueryCurrentChat ?? undefined,
       }))
