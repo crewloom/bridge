@@ -33,20 +33,22 @@ jobs:
 
       - name: Publish package to NPM
         run: |
-          CLEAN_TOKEN=$(node -e "
+          node -e "
             const raw = process.env.RAW_NPM_TOKEN || '';
+            console.log('RAW length:', raw.length);
+            console.log('RAW first 5 charCodes:', Array.from(raw.slice(0, 5)).map(c => c.charCodeAt(0)));
+            console.log('RAW last 5 charCodes:', Array.from(raw.slice(-5)).map(c => c.charCodeAt(0)));
             const match = raw.match(/npm_[A-Za-z0-9_-]+/) || raw.match(/_authToken\s*=\s*([^\s\r\n\"']+)/);
             const token = match ? (match[1] || match[0]) : raw.trim();
-            process.stdout.write(token.replace(/[\"'\r\n\s]/g, ''));
-          ")
-          if [ -z "${CLEAN_TOKEN}" ]; then
-            echo "::error::NPM_TOKEN secret is empty or could not be parsed!"
-            exit 1
-          fi
-          echo "//registry.npmjs.org/:_authToken=${CLEAN_TOKEN}" > "${HOME}/.npmrc"
-          if [ -n "${NPM_CONFIG_USERCONFIG}" ]; then
-            echo "//registry.npmjs.org/:_authToken=${CLEAN_TOKEN}" > "${NPM_CONFIG_USERCONFIG}"
-          fi
-          NODE_AUTH_TOKEN="${CLEAN_TOKEN}" npm publish --access public
+            const clean = token.replace(/[^A-Za-z0-9_.-]/g, '');
+            console.log('CLEAN length:', clean.length);
+            console.log('CLEAN charCodes min/max:', Math.min(...Array.from(clean).map(c => c.charCodeAt(0))), Math.max(...Array.from(clean).map(c => c.charCodeAt(0))));
+            require('fs').writeFileSync(process.env.HOME + '/.npmrc', '//registry.npmjs.org/:_authToken=' + clean + '\n');
+            if (process.env.NPM_CONFIG_USERCONFIG) {
+              require('fs').writeFileSync(process.env.NPM_CONFIG_USERCONFIG, '//registry.npmjs.org/:_authToken=' + clean + '\n');
+            }
+          "
+          npm whoami || true
+          npm publish --access public
         env:
           RAW_NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
