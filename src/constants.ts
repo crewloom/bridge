@@ -3,7 +3,7 @@
  * Modify version and branding here once, and it will reflect across the entire application:
  * CLI, banners, Control Room, Telegram headers, and exports.
  */
-export const APP_NAME = 'AgentGram';
+export const APP_NAME = 'Crewloom Bridge';
 export const APP_VERSION = '2.1.0';
 export const APP_DISPLAY_NAME = `${APP_NAME} v${APP_VERSION}`;
 export const APP_MISSION_CONTROL_HEADER = `⚡ <b>${APP_NAME} v${APP_VERSION} · Mission Control</b>`;

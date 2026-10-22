@@ -1,10 +1,12 @@
 {
-  "name": "agentgram",
+  "name": "crewloom-bridge",
   "version": "2.1.0",
-  "description": "Turn your Telegram into a live AI Agent Control Room. Monitor coding runs, stream real-time logs, approve/reject file diffs, and control multi-machine ops from your phone.",
+  "description": "Crewloom Bridge: Universal AI Agent Control Room & Omni-Channel Mediator (Telegram, Phone, Email, Remote Ops). Monitor runs, stream live logs, approve diffs, and control multi-machine ops.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
+    "crewloom-bridge": "dist/index.js",
+    "cl-bridge": "dist/index.js",
     "agentgram": "dist/index.js",
     "ag": "dist/index.js",
     "rumuze-edit": "dist/index.js"
@@ -41,12 +43,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rumuze/agentgram.git"
+    "url": "git+https://github.com/crewloom/bridge.git"
   },
   "bugs": {
-    "url": "https://github.com/rumuze/agentgram/issues"
+    "url": "https://github.com/crewloom/bridge/issues"
   },
-  "homepage": "https://github.com/rumuze/agentgram#readme",
+  "homepage": "https://github.com/crewloom/bridge#readme",
   "engines": {
     "node": ">=18.0.0"
   },
