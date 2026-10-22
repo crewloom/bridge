@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Configurable CLI engine profiles with literal prompt arguments and trusted local channel/engine plugins, loaded before adapter resolution without rebuilding the bridge.
+- Extension configuration persistence, global/project profile merging, and explicit startup errors for malformed configuration.
+
+### Changed
+- Resolve non-OpenCode engines and all channels through the adapter registries so CLI use supports extensions consistently.
+- Document actual adapter support and distinguish CLI wrappers and application-level policy checks from full engine integration and operating-system sandboxing.
+
 ---
 
 ## [2.0.11] - 2026-10-20

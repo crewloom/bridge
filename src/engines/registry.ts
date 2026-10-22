@@ -6,6 +6,7 @@ import type { IAgentEngine } from './engine.interface.js';
 import type { AgentgramConfig } from '../domain/types.js';
 import { OpenCodeAdapter } from './opencode.adapter.js';
 import { ShellEngineAdapter } from './shell.adapter.js';
+import { parseCliEngines } from '../config/extensions.js';
 
 export type EngineFactory = (config: AgentgramConfig) => IAgentEngine;
 
@@ -26,7 +27,17 @@ export class EngineRegistry {
 
   public static get(id: string, config: AgentgramConfig): IAgentEngine {
     const key = id.toLowerCase();
-    const factory = this.factories.get(key);
+    const profile = config.cliEngines && parseCliEngines(config.cliEngines)[key];
+    if (profile) {
+      return new ShellEngineAdapter({
+        workspaceDir: config.targetDir,
+        cliCommand: profile.command,
+        args: profile.args || [],
+        promptArgs: profile.promptArgs,
+      });
+    }
+    const factory = this.factories.get(key) ??
+      (key === 'sh' || key === 'bash' ? this.factories.get('shell') : undefined);
     if (!factory) {
       const available = Array.from(this.factories.keys()).join(', ');
       throw new Error(`Unknown agent engine: "${id}". Available engines: ${available}`);

@@ -11,13 +11,12 @@ import { ConfigManager, AGENTGRAM_CONFIG_DIR, LEGACY_CONFIG_DIR } from '../confi
 import { TelegramClient, escapeHtml } from '../telegram/telegram-client.js';
 import { OpenCodeClient } from '../opencode/opencode-client.js';
 import { ControlRoom } from '../control-room/control-room.js';
-import { TelegramChannelAdapter } from '../channels/telegram.adapter.js';
-import { ConsoleChannelAdapter } from '../channels/console.adapter.js';
 import { ChannelRegistry } from '../channels/registry.js';
 import type { IChannelAdapter } from '../channels/channel.interface.js';
 import { OpenCodeAdapter } from '../engines/opencode.adapter.js';
 import { ShellEngineAdapter } from '../engines/shell.adapter.js';
 import { EngineRegistry } from '../engines/registry.js';
+import { loadPlugins } from '../plugins/loader.js';
 import type { IAgentEngine } from '../engines/engine.interface.js';
 import { ServiceManager, getEntryPoint } from '../service/service-manager.js';
 import { VERSION, APP_NAME, APP_VERSION } from '../constants.js';
@@ -359,17 +358,12 @@ export async function cmdStart(args: string[]): Promise<void> {
 
   // Resolve Channel Adapter
   let channelAdapter: IChannelAdapter;
-  if (selectedChannel === 'telegram') {
-    channelAdapter = new TelegramChannelAdapter(cfgManager.config.botToken);
-  } else if (selectedChannel === 'console') {
-    channelAdapter = new ConsoleChannelAdapter();
-  } else {
-    try {
-      channelAdapter = ChannelRegistry.get(selectedChannel, cfgManager.config);
-    } catch (err) {
-      error((err as Error).message);
-      process.exit(1);
-    }
+  try {
+    await loadPlugins(cfgManager.config);
+    channelAdapter = ChannelRegistry.get(selectedChannel, cfgManager.config);
+  } catch (err) {
+    error((err as Error).message);
+    process.exit(1);
   }
 
   // Resolve Engine Adapter
@@ -394,15 +388,6 @@ export async function cmdStart(args: string[]): Promise<void> {
         engineAdapter = new ShellEngineAdapter({ workspaceDir: targetDir, cliCommand: 'sh' });
       }
     }
-  } else if (selectedEngine === 'shell' || selectedEngine === 'sh' || selectedEngine === 'bash') {
-    engineAdapter = new ShellEngineAdapter({ workspaceDir: targetDir, cliCommand: 'sh' });
-    success('Shell CLI Engine initialized.');
-  } else if (selectedEngine === 'claude') {
-    engineAdapter = new ShellEngineAdapter({ workspaceDir: targetDir, cliCommand: 'claude' });
-    success('Claude Code Engine initialized.');
-  } else if (selectedEngine === 'aider') {
-    engineAdapter = new ShellEngineAdapter({ workspaceDir: targetDir, cliCommand: 'aider' });
-    success('Aider Engine initialized.');
   } else {
     try {
       engineAdapter = EngineRegistry.get(selectedEngine, cfgManager.config);

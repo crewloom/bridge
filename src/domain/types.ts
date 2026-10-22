@@ -7,6 +7,13 @@ export type ExecutionMode = 'read' | 'build' | 'auto';
 
 export type PermissionDecision = 'allow' | 'reject' | 'ask';
 
+export interface CliEngineProfile {
+  command: string;
+  args?: string[];
+  /** Arguments containing {prompt}; passed directly to the executable, never a shell. */
+  promptArgs: string[];
+}
+
 export interface AgentgramConfig {
   botToken: string;
   allowedChatId: string;
@@ -21,6 +28,9 @@ export interface AgentgramConfig {
   allowedPaths: string[];
   channel?: string;
   engine?: string;
+  cliEngines?: Record<string, CliEngineProfile>;
+  /** Trusted local JavaScript modules resolved relative to targetDir. */
+  plugins?: string[];
   workspaces: string[];
   extra: Record<string, unknown>;
 }

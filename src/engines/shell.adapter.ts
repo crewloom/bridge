@@ -18,6 +18,7 @@ export interface ShellEngineOptions {
   workspaceDir?: string;
   cliCommand?: string; // e.g. 'claude', 'aider', 'sh'
   args?: string[];
+  promptArgs?: string[];
   env?: Record<string, string>;
 }
 
@@ -27,6 +28,7 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
   public workspaceDir: string;
   private readonly cliCommand: string;
   private readonly defaultArgs: string[];
+  private readonly promptArgs: string[] | undefined;
   private activeProcess?: child_process.ChildProcess | undefined;
   public activeSessionId?: string | undefined;
 
@@ -35,6 +37,7 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
     this.workspaceDir = options.workspaceDir || process.cwd();
     this.cliCommand = options.cliCommand || 'sh';
     this.defaultArgs = options.args || [];
+    this.promptArgs = options.promptArgs;
     this.name = `CLI (${this.cliCommand})`;
   }
 
@@ -77,7 +80,7 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
     let resolvedPrompt = prompt.trim();
 
     // 1. Resolve well-known skill scripts if running via sh/bash
-    if (this.cliCommand === 'sh' || this.cliCommand === 'bash') {
+    if (this.promptArgs === undefined && (this.cliCommand === 'sh' || this.cliCommand === 'bash')) {
       const lower = resolvedPrompt.toLowerCase();
       if (lower.startsWith('/pinpoint_go') || lower.startsWith('/pinpoint-go') || lower === 'pinpoint_go' || lower === 'pinpoint-go') {
         const script = path.join(this.workspaceDir, 'tools', 'ai', 'pinpoint_go.sh');
@@ -120,7 +123,9 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
       }
     }
 
-    if (this.cliCommand === 'claude') {
+    if (this.promptArgs !== undefined) {
+      args.push(...this.promptArgs.map((arg) => arg.replaceAll('{prompt}', () => resolvedPrompt)));
+    } else if (this.cliCommand === 'claude') {
       args.push('-p', resolvedPrompt);
     } else if (this.cliCommand === 'aider') {
       args.push('--message', resolvedPrompt, '--yes');
@@ -144,7 +149,7 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
 
     return new Promise((resolve, reject) => {
       try {
-        const isShell = this.cliCommand === 'sh' || this.cliCommand === 'bash';
+        const isShell = this.promptArgs === undefined && (this.cliCommand === 'sh' || this.cliCommand === 'bash');
         const proc = isShell
           ? child_process.spawn(resolvedPrompt, [], {
               cwd: this.workspaceDir,

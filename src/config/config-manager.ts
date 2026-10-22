@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as crypto from 'node:crypto';
 import type { AgentgramConfig } from '../domain/types.js';
+import { parseCliEngines, parsePlugins } from './extensions.js';
 
 export const LEGACY_CONFIG_DIR = path.join(os.homedir(), '.config', 'rumuze-edit');
 export const AGENTGRAM_CONFIG_DIR = path.join(os.homedir(), '.config', 'agentgram');
@@ -64,6 +65,7 @@ export function computeWorkspaceId(directory: string): string {
 }
 
 export class ConfigManager {
+  private loadErrors: string[] = [];
   public config: AgentgramConfig;
   public readonly workspaceId: string;
   public readonly globalConfigPath: string;
@@ -117,13 +119,16 @@ export class ConfigManager {
   }
 
   public load(): void {
+    this.loadErrors = [];
     // 1. Global config file
     if (fs.existsSync(this.globalConfigPath)) {
       try {
         const raw = fs.readFileSync(this.globalConfigPath, 'utf-8');
         const data = JSON.parse(raw);
         this.merge(data);
-      } catch {}
+      } catch {
+        this.loadErrors.push('Invalid global configuration. Check JSON and extension settings.');
+      }
     }
 
     // 2. Project config file (.agentgram.json or legacy .rumuze-edit.json)
@@ -136,7 +141,9 @@ export class ConfigManager {
         const raw = fs.readFileSync(projectPath, 'utf-8');
         const data = JSON.parse(raw);
         this.merge(data);
-      } catch {}
+      } catch {
+        this.loadErrors.push('Invalid project configuration. Check JSON and extension settings.');
+      }
     }
 
     // 3. Environment variables
@@ -191,6 +198,14 @@ export class ConfigManager {
     if (typeof data.channel === 'string') this.config.channel = data.channel.trim();
     if (typeof data.engine === 'string') this.config.engine = data.engine.trim();
 
+    if (data.cliEngines !== undefined) {
+      this.config.cliEngines = { ...this.config.cliEngines, ...parseCliEngines(data.cliEngines) };
+    }
+    if (data.plugins !== undefined) this.config.plugins = parsePlugins(data.plugins);
+    if (typeof data.extra === 'object' && data.extra !== null && !Array.isArray(data.extra)) {
+      this.config.extra = { ...this.config.extra, ...data.extra };
+    }
+
     if (Array.isArray(data.favorite_models)) this.config.favoriteModels = data.favorite_models.map(String);
     if (Array.isArray(data.favoriteModels)) this.config.favoriteModels = data.favoriteModels.map(String);
 
@@ -232,6 +247,8 @@ export class ConfigManager {
       allowed_chat_id: this.config.allowedChatId,
       channel: this.config.channel || 'telegram',
       engine: this.config.engine || 'opencode',
+      cliEngines: this.config.cliEngines,
+      plugins: this.config.plugins,
       default_agent: this.config.defaultAgent,
       default_model: this.config.defaultModel,
       favorite_models: this.config.favoriteModels,
@@ -256,6 +273,8 @@ export class ConfigManager {
       allowed_chat_id: this.config.allowedChatId,
       channel: this.config.channel || 'telegram',
       engine: this.config.engine || 'opencode',
+      cliEngines: this.config.cliEngines,
+      plugins: this.config.plugins,
       default_agent: this.config.defaultAgent,
       default_model: this.config.defaultModel,
       favorite_models: this.config.favoriteModels,
@@ -293,7 +312,7 @@ export class ConfigManager {
   }
 
   public validate(): string[] {
-    const errors: string[] = [];
+    const errors: string[] = [...this.loadErrors];
     const isTelegram = !this.config.channel || this.config.channel === 'telegram';
     if (isTelegram && !this.config.botToken) {
       errors.push('Telegram Bot Token is missing. Run `agentgram init` or set AGENTGRAM_BOT_TOKEN.');

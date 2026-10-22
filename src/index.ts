@@ -25,6 +25,7 @@ export * from './channels/index.js';
 
 // Re-export AI Coding Engines (OpenCode, Shell/Claude/Aider, Custom)
 export * from './engines/index.js';
+export { loadPlugins, type BridgePlugin, type BridgePluginContext } from './plugins/loader.js';
 
 // Re-export Telegram Bot Client
 export { TelegramClient, escapeHtml, stripHtml, splitTextSafely, type SendMessageOptions } from './telegram/telegram-client.js';

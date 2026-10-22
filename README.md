@@ -31,7 +31,7 @@ Developers shouldn't be chained to their desks waiting for an AI agent to finish
 * 🔘 **One-Tap Permission Buttons:** Approve or reject file edits and commands with `[ ✅ Allow Once ]`, `[ ♾️ Always Allow ]`, or `[ ⛔ Reject ]`.
 * ⚡ **Auto Mode:** Enable full autonomy for routine tasks; safety policies automatically intercept destructive commands.
 * 🛡️ **Enterprise Prompt Injection Shield:** Multi-layer defense against role hijacking, jailbreaks, delimiter evasion, and malicious prompt injections.
-* 🔌 **Pluggable Hexagonal Architecture:** Out-of-the-box support for **Telegram** and **OpenCode** as defaults, plus plug-and-play adapters for alternative channels (**Terminal Console**, **Webhooks**, **Slack/Discord**) and coding engines (**Claude Code**, **Aider**, **Shell CLI**).
+* 🔌 **Extensible Channels & Engines:** Built-in **Telegram** and **Console** channels, a dedicated **OpenCode** adapter, and generic CLI wrappers for **Claude Code**, **Aider**, and **Shell**. Configure additional CLI engines or load your own local channel/engine plugin without rebuilding the bridge. Slack, Discord, and Webhooks require an additional adapter.
 * 🌐 **Multi-Machine & Server Ops:** Run operations, SSH jump-host connections, deploy scripts (`pinpoint-go`), and remote log diagnostics directly from your phone.
 * ⚡ **Zero Runtime Dependencies:** 100% Pure Node.js & TypeScript with zero external runtime dependencies. Ultra-lightweight and blazingly fast!
 
@@ -148,9 +148,60 @@ Once connected, your Telegram chat becomes your project mission control:
 
 ---
 
-## 🔒 Security Sandboxing & Prompt Injection Shield
+## 🔌 Extension Configuration
 
-AgentGram is engineered with enterprise zero-trust principles:
+The following support levels describe the adapters included in this package:
+
+| Integration | Included support |
+|---|---|
+| Telegram / Console | Built-in channel adapters |
+| OpenCode | Dedicated engine adapter |
+| Claude Code / Aider / Shell | Generic CLI execution, output, and cancellation; not full OpenCode event/permission parity |
+| Additional CLI tools | Configurable executable and argument templates |
+| Additional channels / engines | Trusted local JavaScript plugin implementing the exported adapter contracts |
+| Slack / Discord / Webhooks | No bundled adapter; supply your own plugin |
+
+### Configure a CLI engine without changing bridge code
+
+Add an engine profile to your project's `.agentgram.json`:
+
+```json
+{
+  "channel": "console",
+  "engine": "my-agent",
+  "cliEngines": {
+    "my-agent": {
+      "command": "my-agent-cli",
+      "args": ["--quiet"],
+      "promptArgs": ["run", "--prompt", "{prompt}"]
+    }
+  }
+}
+```
+
+Replace `my-agent-cli` and its arguments with your installed tool's actual executable and non-interactive options. `{prompt}` is replaced inside each argument and passed directly to the executable without shell interpolation. Profiles can also customize the built-in CLI wrappers; `opencode` remains reserved for the dedicated adapter. Choose another profile with `agentgram start --engine my-agent`.
+
+### Load a local adapter plugin
+
+Create `bridge-plugin.mjs` in your project. This minimal working example registers a named Console channel:
+
+```js
+export function register({ channels, engines, config }) {
+  channels.register('team-console', cfg => channels.get('console', cfg));
+  // Register your own IChannelAdapter or IAgentEngine factory here.
+  // Factories receive the resolved config, including config.extra.
+}
+```
+
+Then add `"plugins": ["./bridge-plugin.mjs"]` and `"channel": "team-console"` to `.agentgram.json`. Plugins are loaded before adapters are resolved. Paths are relative to the project directory; `.js`, `.mjs`, and `.cjs` files are supported. A plugin exports `register(context)` (which may be async), or a default object with that method. The package exports `BridgePluginContext`, `IChannelAdapter`, and `IAgentEngine` for typed plugin authors.
+
+These plugins execute local code with the bridge's privileges: only enable plugins and project configuration you trust. They are not sandboxed. The bridge does not download or install plugins. A missing or invalid plugin stops startup rather than silently falling back.
+
+Global CLI profiles are merged with project profiles by name, with project settings taking precedence. A project's `plugins` list replaces the global list. `extra` settings merge at the top level and survive save/reload. The default Telegram/OpenCode setup requires no extension configuration.
+
+## 🔒 Security Policies & Prompt Injection Checks
+
+The bridge includes application-level policy checks. These are not an operating-system sandbox or a guarantee against prompt injection:
 
 1. **🛡️ Advanced Prompt Injection Defense:**
    - **Role Hijacking & Jailbreak Defense:** Detects and blocks imperative prompt overrides ("ignore previous instructions", "disregard prior directives", "DAN mode", "system override:", and Arabic variants "تجاهل التعليمات السابقة", "أنت الآن في وضع المطور").
