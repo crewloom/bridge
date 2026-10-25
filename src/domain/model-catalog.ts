@@ -274,22 +274,22 @@ export const KNOWN_MODELS: Record<string, ModelMetadata> = {
     tier: 'flagship',
   },
 
-  // Crewloom Custom Decision Models (Local / Self-Hosted)
+  // Crewloom AI · Pulse (Proprietary Local System 1 Engine)
+  'crewloom-ai/pulse-1.5b': {
+    id: 'crewloom-ai/pulse-1.5b',
+    name: 'Crewloom AI · Pulse (1.5B)',
+    provider: 'Crewloom AI',
+    contextWindow: '32k',
+    tag: 'Ultra-Fast Local Decision & MCQ Engine (< 50ms)',
+    tier: 'standard',
+  },
   'crewloom/qwen2.5-decision-1.5b': {
     id: 'crewloom/qwen2.5-decision-1.5b',
-    name: 'Crewloom Qwen 1.5B Decision',
-    provider: 'Crewloom',
+    name: 'Crewloom AI · Pulse (Legacy Alias)',
+    provider: 'Crewloom AI',
     contextWindow: '32k',
     tag: 'Fast Local Multiple-Choice & Decision Model (1.5B)',
     tier: 'standard',
-  },
-  'crewloom/qwen2.5-decision-3b': {
-    id: 'crewloom/qwen2.5-decision-3b',
-    name: 'Crewloom Qwen 3B Decision',
-    provider: 'Crewloom',
-    contextWindow: '32k',
-    tag: 'High-Reasoning Local Choice & Decision Model (3B)',
-    tier: 'flagship',
   },
 };
 
