@@ -311,9 +311,10 @@ export class ConfigManager {
     return false;
   }
 
-  public validate(): string[] {
+  public validate(options: { requireChannelCredentials?: boolean } = {}): string[] {
     const errors: string[] = [...this.loadErrors];
-    const isTelegram = !this.config.channel || this.config.channel === 'telegram';
+    const isTelegram = options.requireChannelCredentials !== false &&
+      (!this.config.channel || this.config.channel === 'telegram');
     if (isTelegram && !this.config.botToken) {
       errors.push('Telegram Bot Token is missing. Run `agentgram init` or set AGENTGRAM_BOT_TOKEN.');
     }

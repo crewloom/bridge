@@ -25,6 +25,7 @@ export * from './channels/index.js';
 
 // Re-export AI Coding Engines (OpenCode, Shell/Claude/Aider, Custom)
 export * from './engines/index.js';
+export { AgentEventServer, type TelemetryEvent } from './control-room/event-server.js';
 export { loadPlugins, type BridgePlugin, type BridgePluginContext } from './plugins/loader.js';
 
 // Re-export Telegram Bot Client

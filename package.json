@@ -5,6 +5,7 @@
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "bin": {
+    "crewloom": "dist/index.js",
     "crewloom-bridge": "dist/index.js",
     "cl-bridge": "dist/index.js",
     "agentgram": "dist/index.js",

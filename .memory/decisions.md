@@ -7,3 +7,4 @@
 - Plugins execute trusted local code with host privileges; no automatic download, installation, or sandbox claim. Malformed extension config or plugin load failures stop startup.
 - Keep OpenCode reserved for the dedicated startup path; configurable profiles can customize other CLI engines.
 - Preserve backward compatibility for existing Telegram, Console, OpenCode, and shell aliases. Documentation distinguishes bundled adapters, generic CLI wrappers, and integrations requiring custom plugins.
+- Integration discovery reports registrations only, never claims that executables are installed or services reachable, and does not include credentials in its output.

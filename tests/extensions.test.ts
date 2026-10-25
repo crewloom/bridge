@@ -25,6 +25,10 @@ test('custom CLI profile executes literal prompt arguments without shell interpo
     },
   });
   const engine = EngineRegistry.get('TEST-CLI', manager.config);
+  assert.ok(EngineRegistry.list(manager.config).includes('test-cli'));
+  assert.ok(EngineRegistry.has('TEST-CLI', manager.config));
+  assert.ok(EngineRegistry.has('bash'));
+  assert.throws(() => EngineRegistry.get('missing', manager.config), /test-cli/);
   const prompt = 'مرحبا "quoted"; $(echo unexpected) `echo nope` $& $\' $`\nsecond line';
   let output = '';
   engine.on('event', (event: AgentEngineEvent) => {
@@ -142,4 +146,37 @@ test('CLI starts a plugin channel with a configured engine and fails on a broken
   const failed = spawnSync(process.execPath, args, options);
   assert.equal(failed.status, 1);
   assert.doesNotMatch(failed.stdout, /EXTENSION_READY/);
+});
+
+test('integration discovery lists extensions without pairing, launching an engine, or exposing credentials', (t) => {
+  const { dir, manager } = fixture(t);
+  fs.writeFileSync(path.join(dir, 'discovery.mjs'), `
+    export function register({ channels }) {
+      channels.register('discovery-channel', () => { throw new Error('Must not start'); });
+    }
+  `);
+  manager.merge({
+    channel: 'telegram',
+    plugins: ['./discovery.mjs'],
+    cliEngines: { absent: { command: 'deliberately-not-installed', promptArgs: ['{prompt}'] } },
+  });
+  manager.config.botToken = '';
+  manager.config.allowedChatId = '';
+  manager.saveProject();
+  assert.ok(manager.validate().length >= 2);
+  const args = [path.resolve('dist/index.js'), 'integrations', '--dir', dir, '--json'];
+  const options = { encoding: 'utf8' as const, timeout: 5000,
+    env: { ...process.env, AGENTGRAM_CONFIG_DIR: path.join(dir, 'isolated-global') } };
+  const unpaired = spawnSync(process.execPath, args, options);
+  assert.equal(unpaired.status, 0, unpaired.stderr);
+  const result = JSON.parse(unpaired.stdout);
+  assert.ok(result.channels.includes('discovery-channel'));
+  assert.ok(result.engines.includes('absent'));
+  assert.equal(result.selected.channel, 'telegram');
+  assert.equal(result.pluginsLoaded, 1);
+  manager.config.botToken = 'fixture-secret-do-not-print';
+  manager.saveProject();
+  const paired = spawnSync(process.execPath, args, options);
+  assert.equal(paired.status, 0, paired.stderr);
+  assert.doesNotMatch(paired.stdout + paired.stderr, /fixture-secret-do-not-print/);
 });

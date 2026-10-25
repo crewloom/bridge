@@ -4,6 +4,13 @@
  * Pure Node.js with zero runtime dependencies.
  */
 import type { EventEmitter } from 'node:events';
+import type { ExecutionMode } from '../domain/types.js';
+
+/** Policy selected by the control room for this invocation. */
+export interface AgentExecutionOptions {
+  mode: ExecutionMode;
+  timeoutMs?: number;
+}
 
 export interface AgentSession {
   id: string;
@@ -60,7 +67,8 @@ export interface IAgentEngine extends EventEmitter {
     sessionId: string,
     prompt: string,
     agent?: string,
-    model?: string
+    model?: string,
+    execution?: AgentExecutionOptions
   ): Promise<void>;
 
   /**

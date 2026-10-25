@@ -24,12 +24,7 @@ export function normalizePath(p: string): string {
   } catch {
     // If the file does not exist, resolve its parent directory to handle /var -> /private/var symlinks
     const parent = path.dirname(resolved);
-    try {
-      const realParent = fs.realpathSync(parent);
-      return path.join(realParent, path.basename(resolved));
-    } catch {
-      return resolved;
-    }
+    return parent === resolved ? resolved : path.join(normalizePath(parent), path.basename(resolved));
   }
 }
 
@@ -40,13 +35,17 @@ export function isPathSafe(targetPath: string, rootDir: string, allowedPaths: st
     const realTarget = normalizePath(targetPath);
 
     // Within primary root directory
-    if (realTarget.startsWith(realRoot)) {
+    const contains = (root: string): boolean => {
+      const relative = path.relative(root, realTarget);
+      return relative === '' || (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`));
+    };
+    if (contains(realRoot)) {
       return true;
     }
 
     // Within explicitly permitted additional directory scopes
     for (const allowed of allowedPaths) {
-      if (allowed && realTarget.startsWith(normalizePath(allowed))) {
+      if (allowed && contains(normalizePath(allowed))) {
         return true;
       }
     }

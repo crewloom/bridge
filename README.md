@@ -4,7 +4,6 @@
 > Control [OpenCode](https://opencode.ai), AI coding agents, and terminal operations on your machine or VPS directly from your phone via Telegram.
 
 [![npm version](https://img.shields.io/npm/v/agentgram.svg?style=flat-square&logo=npm&color=CB3837)](https://www.npmjs.com/package/agentgram)
-[![npm package size](https://img.shields.io/badge/package%20size-52%20kB-22c55e?style=flat-square&logo=npm)](https://www.npmjs.com/package/agentgram)
 [![dependencies](https://img.shields.io/badge/dependencies-0%20(zero)-success.svg?style=flat-square)](https://www.npmjs.com/package/agentgram)
 [![CI Matrix](https://img.shields.io/github/actions/workflow/status/rumuze/agentgram/ci.yml?branch=main&label=CI%20matrix&style=flat-square&logo=githubactions&logoColor=white)](https://github.com/rumuze/agentgram/actions)
 [![GitHub release](https://img.shields.io/github/v/release/rumuze/agentgram?style=flat-square&color=3b82f6&logo=github)](https://github.com/rumuze/agentgram/releases/latest)
@@ -33,7 +32,7 @@ Developers shouldn't be chained to their desks waiting for an AI agent to finish
 * 🛡️ **Enterprise Prompt Injection Shield:** Multi-layer defense against role hijacking, jailbreaks, delimiter evasion, and malicious prompt injections.
 * 🔌 **Extensible Channels & Engines:** Built-in **Telegram** and **Console** channels, a dedicated **OpenCode** adapter, and generic CLI wrappers for **Claude Code**, **Aider**, and **Shell**. Configure additional CLI engines or load your own local channel/engine plugin without rebuilding the bridge. Slack, Discord, and Webhooks require an additional adapter.
 * 🌐 **Multi-Machine & Server Ops:** Run operations, SSH jump-host connections, deploy scripts (`pinpoint-go`), and remote log diagnostics directly from your phone.
-* ⚡ **Zero Runtime Dependencies:** 100% Pure Node.js & TypeScript with zero external runtime dependencies. Ultra-lightweight and blazingly fast!
+* ⚡ **Zero npm Runtime Dependencies:** Uses Node.js built-ins. Your selected coding engine must be installed or available separately.
 
 ---
 
@@ -43,7 +42,7 @@ Developers shouldn't be chained to their desks waiting for an AI agent to finish
 flowchart LR
     User["📱 Telegram / Console / Webhook"] -->|IChannelAdapter| ControlRoom["⚡ AgentGram Control Room"]
     ControlRoom -->|IAgentEngine| Engine["🤖 OpenCode / Claude Code / Shell"]
-    Engine -->|Sandboxed Execution| Project["📂 Project Files & Git"]
+    Engine -->|Configured Execution| Project["📂 Project Files & Git"]
     ControlRoom -->|Authorized Ops / SSH| Remote["🖥️ Remote VPS / Server"]
 ```
 
@@ -199,6 +198,10 @@ These plugins execute local code with the bridge's privileges: only enable plugi
 
 Global CLI profiles are merged with project profiles by name, with project settings taking precedence. A project's `plugins` list replaces the global list. `extra` settings merge at the top level and survive save/reload. The default Telegram/OpenCode setup requires no extension configuration.
 
+### Discover available integrations
+
+Run `agentgram integrations --dir /path/to/project` (or add `--json`) to list built-in adapters, configured CLI profiles, plugin registrations, and the selected channel/engine. This command loads the configured trusted plugins but does not start a channel or engine and does not require Telegram pairing. Registration does not prove that a CLI executable is installed or a service is reachable.
+
 ## 🔒 Security Policies & Prompt Injection Checks
 
 The bridge includes application-level policy checks. These are not an operating-system sandbox or a guarantee against prompt injection:
@@ -228,6 +231,7 @@ COMMANDS:
   start              Start the control room for the current project
   stop               Stop running background daemon
   status             Display current daemon, server, and workspace status
+      integrations       List built-in adapters, profiles, and plugin registrations
   service install    Install as persistent background service (macOS launchd / Linux systemd)
   service uninstall  Remove persistent background service
   service status     Check persistent background service status

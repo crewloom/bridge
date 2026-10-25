@@ -10,13 +10,17 @@ cd "$PROJECT_DIR"
 
 echo "🔍 Validating Git status in $PROJECT_DIR..."
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
-if [[ "$CURRENT_BRANCH" != "main" && "$CURRENT_BRANCH" != "master" ]]; then
-  echo "⚠️ Warning: You are on branch '$CURRENT_BRANCH', not main."
+if [[ "$CURRENT_BRANCH" == HEAD || -n "$(git status --porcelain)" ]]; then
+  echo "Release requires a branch with a clean working tree and index." >&2
+  exit 1
 fi
+command -v gh >/dev/null
 
 # Run build & verification
 echo "📦 Running build..."
 npm run build
+npx tsc --noEmit
+npm test
 
 # Bump version in package.json
 OLD_VERSION="$(node -p "require('./package.json').version")"
@@ -27,23 +31,18 @@ TAG_NAME="v$NEW_VERSION"
 echo "🚀 Bumping version: $OLD_VERSION -> $NEW_VERSION (Tag: $TAG_NAME)"
 
 # Stage & commit
-git add package.json package-lock.json dist/ CHANGELOG.md 2>/dev/null || git add package.json package-lock.json dist/
-git commit -m "chore(release): $TAG_NAME" || true
+git add package.json package-lock.json CHANGELOG.md
+git commit -m "chore(release): $TAG_NAME"
 
 # Create annotated tag
 git tag -a "$TAG_NAME" -m "Release $TAG_NAME - Crewloom Bridge"
 
 # Push to origin
 echo "⬆️ Pushing commit and tags to origin..."
-git push origin "$CURRENT_BRANCH" --tags
+git push origin "HEAD:refs/heads/$CURRENT_BRANCH" "refs/tags/$TAG_NAME"
 
 # GitHub Release via gh CLI
-if command -v gh >/dev/null 2>&1; then
-  echo "📢 Publishing GitHub Release for $TAG_NAME..."
-  gh release create "$TAG_NAME" \
-    --title "Crewloom Bridge $TAG_NAME" \
-    --generate-notes \
-    --repo crewloom/bridge || echo "⚠️ GitHub release create failed or already exists"
-fi
+gh release create "$TAG_NAME" --verify-tag \
+  --title "Crewloom Bridge $TAG_NAME" --generate-notes
 
 echo "✅ Successfully released $TAG_NAME!"

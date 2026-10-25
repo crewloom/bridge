@@ -39,17 +39,20 @@ export class EngineRegistry {
     const factory = this.factories.get(key) ??
       (key === 'sh' || key === 'bash' ? this.factories.get('shell') : undefined);
     if (!factory) {
-      const available = Array.from(this.factories.keys()).join(', ');
+      const available = this.list(config).join(', ');
       throw new Error(`Unknown agent engine: "${id}". Available engines: ${available}`);
     }
     return factory(config);
   }
 
-  public static has(id: string): boolean {
-    return this.factories.has(id.toLowerCase());
+  public static has(id: string, config?: AgentgramConfig): boolean {
+    const key = id.toLowerCase();
+    return this.list(config).includes(key) ||
+      ((key === 'sh' || key === 'bash') && this.factories.has('shell'));
   }
 
-  public static list(): string[] {
-    return Array.from(this.factories.keys());
+  public static list(config?: AgentgramConfig): string[] {
+    const profiles = config?.cliEngines ? parseCliEngines(config.cliEngines) : {};
+    return [...new Set([...this.factories.keys(), ...Object.keys(profiles)])];
   }
 }

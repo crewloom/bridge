@@ -11,6 +11,7 @@ import { ConfigManager, AGENTGRAM_CONFIG_DIR, LEGACY_CONFIG_DIR } from '../confi
 import { TelegramClient, escapeHtml } from '../telegram/telegram-client.js';
 import { OpenCodeClient } from '../opencode/opencode-client.js';
 import { ControlRoom } from '../control-room/control-room.js';
+import { AgentEventServer } from '../control-room/event-server.js';
 import { ChannelRegistry } from '../channels/registry.js';
 import type { IChannelAdapter } from '../channels/channel.interface.js';
 import { OpenCodeAdapter } from '../engines/opencode.adapter.js';
@@ -57,7 +58,7 @@ export function error(msg: string): void {
 
 export function printBanner(): void {
   log(`\n${C.bold}${C.cyan}╔═══════════════════════════════════════════════════════╗${C.reset}`);
-  log(`${C.bold}${C.cyan}║   ⚡ AgentGram v${VERSION} — AI Agent Control Room         ║${C.reset}`);
+  log(`${C.bold}${C.cyan}║   ⚡ ${APP_NAME} v${VERSION} — Agent Control Room       ║${C.reset}`);
   log(`${C.bold}${C.cyan}║   Turn your Telegram into a Remote Ops Command Center ║${C.reset}`);
   log(`${C.bold}${C.cyan}╚═══════════════════════════════════════════════════════╝${C.reset}\n`);
 }
@@ -402,11 +403,13 @@ export async function cmdStart(args: string[]): Promise<void> {
     engine: engineAdapter,
     configManager: cfgManager,
   });
+  const events = new AgentEventServer((event) => room.receiveTelemetry(event), process.env.CREWLOOM_BRIDGE_TOKEN || '');
 
   // Graceful shutdown handling
-  const cleanup = () => {
-    log(`\n${C.yellow}Shutting down AgentGram Control Room...${C.reset}`);
-    room.stop();
+  const cleanup = async () => {
+    log(`\n${C.yellow}Shutting down Crewloom Bridge...${C.reset}`);
+    await room.stop();
+    await events.stop();
     if (spawnedOc) {
       spawnedOc.client.killServer();
     }
@@ -417,6 +420,14 @@ export async function cmdStart(args: string[]): Promise<void> {
   process.on('SIGTERM', cleanup);
 
   await room.start();
+  if (process.env.CREWLOOM_BRIDGE_EVENTS !== '0') {
+    try {
+      await events.start(Number(process.env.CREWLOOM_BRIDGE_PORT || '56079'));
+    } catch (err) {
+      await room.stop();
+      throw err;
+    }
+  }
 }
 
 /**
@@ -536,8 +547,33 @@ export function cmdService(subcmd?: string, args: string[] = []): void {
 }
 
 /**
- * Print help menu.
+ * Discover configured integrations without starting channels or engines.
  */
+export async function cmdIntegrations(args: string[]): Promise<void> {
+  const dirIdx = args.indexOf('--dir') !== -1 ? args.indexOf('--dir') : args.indexOf('-C');
+  const directory = dirIdx !== -1 && args[dirIdx + 1] ? args[dirIdx + 1]! : process.cwd();
+  const manager = new ConfigManager(directory);
+  const errors = manager.validate({ requireChannelCredentials: false });
+  if (errors.length) throw new Error(errors.join('\n'));
+  await loadPlugins(manager.config);
+  const integrations = {
+    channels: ChannelRegistry.list(),
+    engines: EngineRegistry.list(manager.config),
+    selected: { channel: manager.config.channel, engine: manager.config.engine },
+    pluginsLoaded: manager.config.plugins?.length || 0,
+  };
+  if (args.includes('--json')) {
+    log(JSON.stringify(integrations, null, 2));
+    return;
+  }
+  log(`Channels: ${integrations.channels.join(', ')}`);
+  log(`Engines: ${integrations.engines.join(', ')}`);
+  log(`Selected: ${integrations.selected.channel} / ${integrations.selected.engine}`);
+  log(`Plugins loaded: ${integrations.pluginsLoaded}`);
+  log('Lists registered adapters, not installed executables or verified service connections.');
+}
+
+/** Print help menu. */
 export function cmdHelp(): void {
   printBanner();
   log(`Usage: agentgram <command> [options]\n`);
@@ -546,6 +582,7 @@ export function cmdHelp(): void {
   log(`  start [options]       Launch AgentGram Control Room (foreground or background)`);
   log(`  stop                  Stop running background daemon`);
   log(`  status                Display daemon, pairing, and service health overview`);
+  log(`  integrations          List available adapters and configured CLI engines`);
   log(`  service <subcmd>      Manage OS service (install, uninstall, status)`);
   log(`  help                  Display this help message\n`);
   log(`Options:`);
@@ -553,6 +590,7 @@ export function cmdHelp(): void {
   log(`  -C, --dir <path>      Specify workspace directory (defaults to current dir)`);
   log(`  --channel <name>      Communication channel: telegram (default), console`);
   log(`  --engine <name>       AI coding engine: opencode (default), shell, claude, aider`);
+  log(`  --json                Machine-readable output for integrations`);
   log(`  -v, --version         Display AgentGram version\n`);
   log(`Examples:`);
   log(`  agentgram init`);
@@ -591,6 +629,9 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<vo
       break;
     case 'status':
       cmdStatus();
+      break;
+    case 'integrations':
+      await cmdIntegrations(rest);
       break;
     case 'service':
       cmdService(rest[0], rest.slice(1));

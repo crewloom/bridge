@@ -7,11 +7,13 @@ import * as child_process from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { EventEmitter } from 'node:events';
+import { randomUUID } from 'node:crypto';
 import type {
   IAgentEngine,
   AgentSession,
   AgentSessionOptions,
   AgentEngineEvent,
+  AgentExecutionOptions,
 } from './engine.interface.js';
 
 export interface ShellEngineOptions {
@@ -31,6 +33,11 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
   private readonly promptArgs: string[] | undefined;
   private activeProcess?: child_process.ChildProcess | undefined;
   public activeSessionId?: string | undefined;
+  private pendingPermission: { id: string; resolve: (allow: boolean) => void } | undefined;
+  private running = false;
+  private cancelled = false;
+  private stopping: Promise<void> | undefined;
+  private readonly childEnv: Record<string, string> | undefined;
 
   constructor(options: ShellEngineOptions = {}) {
     super();
@@ -39,23 +46,19 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
     this.defaultArgs = options.args || [];
     this.promptArgs = options.promptArgs;
     this.name = `CLI (${this.cliCommand})`;
+    this.childEnv = options.env;
   }
 
   public async connect(): Promise<void> {
     // Ready for process execution
   }
 
-  public disconnect(): void {
-    if (this.activeProcess) {
-      try {
-        this.activeProcess.kill('SIGTERM');
-      } catch {}
-      this.activeProcess = undefined;
-    }
+  public async disconnect(): Promise<void> {
+    await this.abortSession(this.activeSessionId || '');
   }
 
   public async createSession(options?: AgentSessionOptions): Promise<AgentSession> {
-    const id = `session-${Date.now()}`;
+    const id = `session-${randomUUID()}`;
     this.activeSessionId = id;
     if (options?.workspaceDir) {
       this.workspaceDir = options.workspaceDir;
@@ -71,8 +74,13 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
     sessionId: string,
     prompt: string,
     _agent?: string,
-    _model?: string
+    _model?: string,
+    execution?: AgentExecutionOptions
   ): Promise<void> {
+    if (this.running || this.stopping) throw new Error('A CLI operation is already active.');
+    if (execution?.mode === 'read') {
+      throw new Error('Read mode refuses CLI execution: this engine cannot enforce read-only tool access.');
+    }
     this.activeSessionId = sessionId;
 
     let command = this.cliCommand;
@@ -135,8 +143,39 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
       args.push(resolvedPrompt);
     }
 
-    const toolId = `tool-${Date.now()}`;
+    const toolId = `tool-${randomUUID()}`;
     const cmdPreview = `${command} ${args.join(' ')}`;
+    this.running = true;
+    this.cancelled = false;
+    const timeoutMs = execution?.timeoutMs ?? 300000;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      this.running = false;
+      throw new Error('CLI execution needs a positive finite timeout.');
+    }
+    // Omitted options preserve trusted direct API invocations. The control room always supplies its mode.
+    if (execution) {
+      const permissionId = `per_${randomUUID()}`;
+      const allowed = await new Promise<boolean>((resolve) => {
+        const timer = setTimeout(() => {
+          this.pendingPermission = undefined;
+          resolve(false);
+        }, timeoutMs);
+        this.pendingPermission = { id: permissionId, resolve: (allow) => { clearTimeout(timer); resolve(allow); } };
+        this.emit('event', { type: 'permission.ask', properties: {
+          id: permissionId, permission: 'bash', metadata: {
+            command: this.cliCommand === 'sh' || this.cliCommand === 'bash' ? resolvedPrompt : cmdPreview,
+          },
+        } });
+      });
+      this.pendingPermission = undefined;
+      if (!allowed || this.cancelled) {
+        this.running = false;
+        this.emit('event', { type: 'step_finish', properties: {
+          id: toolId, status: this.cancelled ? 'aborted' : 'error', error: 'CLI execution was not approved.',
+        } });
+        return;
+      }
+    }
     this.emit('event', {
       type: 'tool.execute',
       properties: {
@@ -148,6 +187,7 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
     } as AgentEngineEvent);
 
     return new Promise((resolve, reject) => {
+      let timer: NodeJS.Timeout | undefined;
       try {
         const isShell = this.promptArgs === undefined && (this.cliCommand === 'sh' || this.cliCommand === 'bash');
         const proc = isShell
@@ -156,12 +196,14 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
               shell: true,
               stdio: ['pipe', 'pipe', 'pipe'],
               env: { ...process.env },
+              detached: process.platform !== 'win32',
             })
           : child_process.spawn(command, args, {
               cwd: this.workspaceDir,
               shell: false,
               stdio: ['pipe', 'pipe', 'pipe'],
-              env: { ...process.env },
+              env: { ...process.env, ...this.childEnv },
+              detached: process.platform !== 'win32',
             });
 
         // Close stdin immediately so commands never block on interactive read(0)
@@ -170,12 +212,13 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
         } catch {}
 
         this.activeProcess = proc;
+        timer = setTimeout(() => { void this.abortSession(sessionId); }, timeoutMs);
         let stdout = '';
         let stderr = '';
 
         proc.stdout?.on('data', (data) => {
           const chunk = data.toString();
-          stdout += chunk;
+          stdout = (stdout + chunk).slice(-65536);
           this.emit('event', {
             type: 'tool.output',
             properties: {
@@ -189,7 +232,7 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
 
         proc.stderr?.on('data', (data) => {
           const chunk = data.toString();
-          stderr += chunk;
+          stderr = (stderr + chunk).slice(-65536);
           this.emit('event', {
             type: 'tool.output',
             properties: {
@@ -202,6 +245,8 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
         });
 
         proc.on('error', (err) => {
+          clearTimeout(timer);
+          this.running = false;
           this.activeProcess = undefined;
           this.emit('event', {
             type: 'step_finish',
@@ -215,7 +260,10 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
         });
 
         proc.on('close', (code) => {
-          this.activeProcess = undefined;
+          clearTimeout(timer);
+          if (this.activeProcess === proc) this.activeProcess = undefined;
+          this.running = false;
+          if (this.cancelled) { resolve(); return; }
           this.emit('event', {
             type: 'step_finish',
             properties: {
@@ -229,32 +277,58 @@ export class ShellEngineAdapter extends EventEmitter implements IAgentEngine {
           resolve();
         });
       } catch (err) {
+        clearTimeout(timer);
+        this.running = false;
         this.activeProcess = undefined;
         reject(err);
       }
     });
   }
 
-  public async abortSession(_sessionId: string): Promise<void> {
-    if (this.activeProcess) {
-      try {
-        this.activeProcess.kill('SIGTERM');
-      } catch {}
-      this.activeProcess = undefined;
+  public async abortSession(sessionId: string): Promise<void> {
+    if (sessionId !== this.activeSessionId) return;
+    if (this.stopping) return this.stopping;
+    this.cancelled = true;
+    if (this.pendingPermission) {
+      this.pendingPermission.resolve(false);
+      this.pendingPermission = undefined;
+      return;
     }
-    this.emit('event', {
-      type: 'step_finish',
-      properties: {
-        status: 'aborted',
-      },
-    } as AgentEngineEvent);
+    const proc = this.activeProcess;
+    if (!proc?.pid) return;
+    const pid = proc.pid;
+    this.stopping = (async () => {
+      if (process.platform === 'win32') {
+        await new Promise<void>((resolve, reject) => {
+          const killer = child_process.spawn('taskkill', ['/pid', String(pid), '/T', '/F'], { stdio: 'ignore' });
+          killer.once('error', reject);
+          killer.once('close', (code) => code === 0 ? resolve() : reject(new Error('Could not terminate the CLI process tree.')));
+        });
+      } else {
+        const signalGroup = (signal: NodeJS.Signals) => {
+          try { process.kill(-pid, signal); }
+          catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
+        };
+        signalGroup('SIGTERM');
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        signalGroup('SIGKILL');
+      }
+      if (proc.exitCode === null && proc.signalCode === null) {
+        await new Promise<void>((resolve) => proc.once('close', () => resolve()));
+      }
+      this.running = false;
+      this.emit('event', { type: 'step_finish', properties: { status: 'aborted' } });
+    })();
+    try { await this.stopping; } finally { this.stopping = undefined; }
   }
 
   public async replyPermission(
-    _permissionId: string,
-    _decision: 'allow' | 'always' | 'reject'
+    permissionId: string,
+    decision: 'allow' | 'always' | 'reject'
   ): Promise<void> {
-    // Shell process permission acknowledgement
+    if (this.pendingPermission?.id !== permissionId) throw new Error('Unknown or expired CLI permission request.');
+    this.pendingPermission.resolve(decision !== 'reject');
+    this.pendingPermission = undefined;
   }
 
   public async getDiff(): Promise<string> {

@@ -5,17 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.2.0] - 2026-10-25
 
 ### Added
-- Configurable CLI engine profiles with literal prompt arguments and trusted local channel/engine plugins, loaded before adapter resolution without rebuilding the bridge.
-- Extension configuration persistence, global/project profile merging, and explicit startup errors for malformed configuration.
+- Modular Control Room architecture: extracted handlers into dedicated `callbacks/`, `engine-events/`, `views/`, and `submit/` pipelines.
+- Robust state management with `RoomSession` lifecycle and session preference persistence.
+- Unified prompt guard pipeline isolating untrusted content and enforcing security policies.
+- Comprehensive test suite covering architecture, event server, callback router, permissions, and security policies (74 passing tests).
+- Automated CI release flow and npm publication triggers.
 
 ### Changed
-- Resolve non-OpenCode engines and all channels through the adapter registries so CLI use supports extensions consistently.
-- Document actual adapter support and distinguish CLI wrappers and application-level policy checks from full engine integration and operating-system sandboxing.
+- Refactored `control-room.ts` from 2300+ lines into modular domain components adhering strictly to AGENTS.md architectural boundaries.
 
 ---
+
+## [2.1.0] - 2026-10-22
 
 ## [2.0.11] - 2026-10-20
 

@@ -273,6 +273,24 @@ export const KNOWN_MODELS: Record<string, ModelMetadata> = {
     tag: 'Open-Weights Coding Champion',
     tier: 'flagship',
   },
+
+  // Crewloom Custom Decision Models (Local / Self-Hosted)
+  'crewloom/qwen2.5-decision-1.5b': {
+    id: 'crewloom/qwen2.5-decision-1.5b',
+    name: 'Crewloom Qwen 1.5B Decision',
+    provider: 'Crewloom',
+    contextWindow: '32k',
+    tag: 'Fast Local Multiple-Choice & Decision Model (1.5B)',
+    tier: 'standard',
+  },
+  'crewloom/qwen2.5-decision-3b': {
+    id: 'crewloom/qwen2.5-decision-3b',
+    name: 'Crewloom Qwen 3B Decision',
+    provider: 'Crewloom',
+    contextWindow: '32k',
+    tag: 'High-Reasoning Local Choice & Decision Model (3B)',
+    tier: 'flagship',
+  },
 };
 
 /**
