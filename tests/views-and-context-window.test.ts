@@ -133,3 +133,14 @@ test('View Builders - Modular views construct valid Telegram cards and keyboards
   assert.ok(missionCard.includes('MiniMax'));
   assert.ok(missionCard.includes('Refactor views'));
 });
+
+test('resolveModelMetadata - Crewloom AI Pulse resolves to its proprietary 32k entry, legacy alias included', () => {
+  const pulse = resolveModelMetadata('crewloom-ai/pulse-1.5b');
+  assert.equal(pulse.contextWindow, '32k');
+  assert.equal(pulse.provider, 'Crewloom AI');
+  assert.equal(pulse.name, 'Crewloom AI · Pulse (1.5B)');
+
+  const legacy = resolveModelMetadata('crewloom/qwen2.5-decision-1.5b');
+  assert.equal(legacy.contextWindow, '32k');
+  assert.equal(legacy.provider, 'Crewloom AI');
+});
