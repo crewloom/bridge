@@ -1,6 +1,6 @@
 {
   "name": "crewloom-bridge",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "Crewloom Bridge: Universal AI Agent Control Room & Omni-Channel Mediator (Telegram, Phone, Email, Remote Ops). Monitor runs, stream live logs, approve diffs, and control multi-machine ops.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
