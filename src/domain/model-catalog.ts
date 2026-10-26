@@ -90,6 +90,56 @@ export const KNOWN_MODELS: Record<string, ModelMetadata> = {
     tier: 'flagship',
   },
 
+  // OpenAI Codex Models (CLI / ChatGPT Subscription)
+  'gpt-5.6-luna': {
+    id: 'gpt-5.6-luna',
+    name: 'GPT-5.6 Luna',
+    provider: 'Codex CLI',
+    contextWindow: '200k',
+    tag: 'Flagship Codex Agent & Verified Stability',
+    tier: 'flagship',
+  },
+  'gpt-5.6-sol': {
+    id: 'gpt-5.6-sol',
+    name: 'GPT-5.6 Sol',
+    provider: 'Codex CLI',
+    contextWindow: '200k',
+    tag: 'Multimodal Codex Runtime Model',
+    tier: 'flagship',
+  },
+  'gpt-6-sol': {
+    id: 'gpt-6-sol',
+    name: 'GPT-6 Sol',
+    provider: 'Codex CLI',
+    contextWindow: '200k',
+    tag: 'Versatile Workhorse for Coding & Tasks',
+    tier: 'flagship',
+  },
+  'gpt-6-luna': {
+    id: 'gpt-6-luna',
+    name: 'GPT-6 Luna',
+    provider: 'Codex CLI',
+    contextWindow: '200k',
+    tag: 'High Throughput Low-Latency Reasoning',
+    tier: 'flagship',
+  },
+  'gpt-6-astra': {
+    id: 'gpt-6-astra',
+    name: 'GPT-6 Astra',
+    provider: 'Codex CLI',
+    contextWindow: '200k',
+    tag: 'Frontier Reasoning Architecture',
+    tier: 'flagship',
+  },
+  'gpt-5-codex': {
+    id: 'gpt-5-codex',
+    name: 'GPT-5 Codex',
+    provider: 'Codex CLI',
+    contextWindow: '200k',
+    tag: 'Complex Architectural Planning & Synthesis',
+    tier: 'flagship',
+  },
+
   // Google Gemini
   'gemini-1.5-pro': {
     id: 'gemini-1.5-pro',
@@ -189,6 +239,22 @@ export const KNOWN_MODELS: Record<string, ModelMetadata> = {
     provider: 'OpenCode Free',
     contextWindow: '128k',
     tag: 'Lightweight Fast Automation',
+    tier: 'free',
+  },
+  'beam-free': {
+    id: 'beam-free',
+    name: 'Beam Free',
+    provider: 'OpenCode Free',
+    contextWindow: '128k',
+    tag: 'Lightweight Fast Automation',
+    tier: 'free',
+  },
+  'glm-5.3-flash-free': {
+    id: 'glm-5.3-flash-free',
+    name: 'GLM 5.3 Flash Free',
+    provider: 'OpenCode Free',
+    contextWindow: '128k',
+    tag: 'High Concurrency Coding',
     tier: 'free',
   },
   'opencode/big-pickle': {
