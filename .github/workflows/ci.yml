@@ -43,3 +43,13 @@ jobs:
           node dist/index.js --version
           node dist/index.js --help
           node dist/index.js status
+
+  # Single stable check for branch protection; matrix job names change with the Node versions.
+  ci-result:
+    name: CI result
+    needs: test
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every test job to pass
+        run: test "${{ needs.test.result }}" = success
