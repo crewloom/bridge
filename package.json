@@ -51,7 +51,10 @@
   },
   "homepage": "https://github.com/crewloom/bridge#readme",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "dependencies": {
+    "@crewloom/contracts": "^1.1.0"
   },
   "publishConfig": {
     "access": "public"

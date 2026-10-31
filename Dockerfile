@@ -1,6 +1,6 @@
 # Production-grade Dockerfile for AgentGram
 # Pure Node.js with zero runtime dependencies
-FROM node:20-slim AS base
+FROM node:24-slim AS base
 
 ENV DEBIAN_FRONTEND=noninteractive
 
