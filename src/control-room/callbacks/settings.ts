@@ -101,37 +101,6 @@ const selectLanguage: CallbackHandler = async (deps, call) => {
   );
 };
 
-/** Parses `pe:a:<id>:<version>` / `pe:d:<id>:<version>` into `{ id, version }`; ids carry no colon. */
-function parsePersonaRef(arg: string): { id: string; version: number } | null {
-  const sep = arg.lastIndexOf(':');
-  if (sep <= 0) return null;
-  const version = Number(arg.slice(sep + 1));
-  if (!Number.isInteger(version) || version <= 0) return null;
-  return { id: arg.slice(0, sep), version };
-}
-
-const activatePersona: CallbackHandler = async (deps, call) => {
-  const ref = parsePersonaRef(call.arg);
-  if (!ref) { await call.toast(); return; }
-  const result = await deps.personalization.activate(ref.id, ref.version);
-  await call.toast(pick(deps.session.currentLanguage,
-    result.ok ? '🧑 تم تفعيل الشخصية' : `⚠️ فشل التفعيل: ${result.error ?? ''}`,
-    result.ok ? '🧑 Persona activated' : `⚠️ Activation failed: ${result.error ?? ''}`));
-  await confirmChange(deps, call, (id) => deps.actions.sendPersonaMenu(id),
-    result.ok ? '🧑 Persona activated.' : `⚠️ Activation failed: ${result.error ?? ''}`);
-};
-
-const disablePersona: CallbackHandler = async (deps, call) => {
-  const ref = parsePersonaRef(call.arg);
-  if (!ref) { await call.toast(); return; }
-  const result = await deps.personalization.disable(ref.id, ref.version);
-  await call.toast(pick(deps.session.currentLanguage,
-    result.ok ? '🧑 تم إيقاف الشخصية' : `⚠️ فشل الإيقاف: ${result.error ?? ''}`,
-    result.ok ? '🧑 Persona disabled' : `⚠️ Disable failed: ${result.error ?? ''}`));
-  await confirmChange(deps, call, (id) => deps.actions.sendPersonaMenu(id),
-    result.ok ? '🧑 Persona disabled.' : `⚠️ Disable failed: ${result.error ?? ''}`);
-};
-
 export function registerSettingsRoutes(router: CallbackRouter): void {
   router
     .onPrefix('ag:', selectAgent)
@@ -140,7 +109,5 @@ export function registerSettingsRoutes(router: CallbackRouter): void {
     .onPrefix('m:', selectModel(modelByIndex))
     .onPrefix('mo:', selectMode)
     .onPrefix('sk:', selectSkill)
-    .onPrefix('pe:a:', activatePersona)
-    .onPrefix('pe:d:', disablePersona)
     .onPrefix('lang:', selectLanguage);
 }

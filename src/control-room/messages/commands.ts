@@ -29,7 +29,6 @@ const COMMANDS: Array<{ aliases: string[]; run: Command }> = [
   },
   { aliases: ['/diff', '@diff'], run: (d) => d.actions.sendDiff() },
   { aliases: ['/skills', '@skills'], run: (d) => d.actions.sendSkillsMenu() },
-  { aliases: ['/persona', '@persona'], run: (d) => d.actions.sendPersonaMenu() },
   { aliases: ['/usage', '@usage'], run: (d) => d.actions.sendUsageReport() },
   { aliases: ['/handoff', '@handoff'], run: (d) => d.actions.sendHandoffReport() },
   { aliases: ['/stop', '@stop'], run: (d) => d.actions.abortCurrentRun() },

@@ -2,7 +2,7 @@ import type { RoomContext } from '../context.js';
 
 export type CallbackDeps = Pick<
   RoomContext,
-  'channel' | 'engine' | 'chatId' | 'session' | 'policy' | 'targetDir' | 'config' | 'personalization' | 'actions'
+  'channel' | 'engine' | 'chatId' | 'session' | 'policy' | 'targetDir' | 'config' | 'actions'
 >;
 
 /** One button press, with the part of the callback data after the matched prefix already split off. */

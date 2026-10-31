@@ -1,5 +1,4 @@
 import { escapeHtml } from '../../telegram/telegram-client.js';
-import { personaPromptSection, skillsPromptSection, type PersonaProfile, type UserSkill } from '@crewloom/contracts';
 import { pick } from '../context.js';
 import { say } from '../reply.js';
 import { createRun } from '../run-factory.js';
@@ -7,27 +6,6 @@ import { PROMPT_GUARDS, type SubmitDeps } from './guards.js';
 
 export type { SubmitDeps, PromptGuard } from './guards.js';
 export { PROMPT_GUARDS } from './guards.js';
-
-export interface PromptParts {
-  /** The one-shot skill armed for this prompt, or null. */
-  readonly skill: string | null;
-  /** The active persona for a new task, or null. */
-  readonly persona: PersonaProfile | null;
-  /** The active user skills, rendered as one section. */
-  readonly skills: readonly UserSkill[];
-}
-
-/**
- * Assembles the final prompt sent to the engine: the armed skill, then the active persona and user
- * skills, then the owner's message. Empty sections are dropped; the message is always last.
- */
-export function buildFinalPrompt(prompt: string, parts: PromptParts): string {
-  const sections: string[] = [];
-  if (parts.skill) sections.push(`[Active Skill: ${parts.skill}]`);
-  if (parts.persona) sections.push(personaPromptSection(parts.persona));
-  if (parts.skills.length > 0) sections.push(skillsPromptSection(parts.skills));
-  return sections.length > 0 ? `${sections.join('\n\n')}\n${prompt}` : prompt;
-}
 
 /** Starts a run: opens (or continues) the engine session, posts the mission card, then hands the prompt over. */
 async function startRun(deps: SubmitDeps, prompt: string, replyTo?: string | number): Promise<void> {
@@ -52,12 +30,8 @@ async function startRun(deps: SubmitDeps, prompt: string, replyTo?: string | num
   await deps.missionCard.post(replyTo);
   deps.missionCard.startRefreshing();
 
-  const personal = deps.personalization.forNewTask();
-  const finalPrompt = buildFinalPrompt(prompt, {
-    skill: session.consumeSkill(),
-    persona: personal.persona,
-    skills: personal.skills,
-  });
+  const skill = session.consumeSkill();
+  const finalPrompt = skill ? `[Active Skill: ${skill}]\n${prompt}` : prompt;
 
   // Not awaited: the room keeps listening while the engine waits on a permission or runs a command.
   void engine

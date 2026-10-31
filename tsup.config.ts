@@ -8,7 +8,6 @@ export default defineConfig({
   sourcemap: true,
   dts: true,
   minify: false,
-  noExternal: ['@crewloom/contracts'],
   banner: {
     js: '#!/usr/bin/env node',
   },
