@@ -77,6 +77,7 @@ export function registerMenuRoutes(router: CallbackRouter): void {
     .on('menu:se', openMenu((a, id) => a.sendSessionsMenu(id)))
     .on('menu:ws', openMenu((a, id) => a.sendWorkspaceMenu(id)))
     .on('menu:sk', openMenu((a, id) => a.sendSkillsMenu(0, id)))
+    .on('menu:pe', openMenu((a, id) => a.sendPersonaMenu(id)))
     .on('menu:lg', openMenu((a, id) => a.sendLanguageMenu(id)))
     .on('menu:md', modelsHome)
     .onPrefix('pg:', modelsPage)

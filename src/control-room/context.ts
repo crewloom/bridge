@@ -2,6 +2,7 @@ import type { ChannelKeyboard, IChannelAdapter, IncomingChannelMessage } from '.
 import type { ConfigManager } from '../config/config-manager.js';
 import type { InlineKeyboardMarkup } from '../domain/types.js';
 import type { AgentEngineEvent, IAgentEngine } from '../engines/engine.interface.js';
+import type { PersonalizationService } from '../personalization/service.js';
 import type { SecurityPolicy } from '../security/policy.js';
 import type { MissionCard } from './mission-card.js';
 import type { Language, RoomSession } from './session.js';
@@ -20,6 +21,7 @@ export interface RoomActions {
   sendSessionsMenu(editMsgId?: string | number): Promise<void>;
   sendWorkspaceMenu(editMsgId?: string | number): Promise<void>;
   sendSkillsMenu(page?: number, editMsgId?: string | number): Promise<void>;
+  sendPersonaMenu(editMsgId?: string | number): Promise<void>;
   sendMentionsHub(editMsgId?: string | number): Promise<void>;
   sendLanguageMenu(editMsgId?: string | number): Promise<void>;
   sendStatusReport(): Promise<void>;
@@ -43,6 +45,7 @@ export interface RoomContext {
   readonly targetDir: string;
   readonly config: ConfigManager['config'];
   readonly missionCard: MissionCard;
+  readonly personalization: PersonalizationService;
   readonly actions: RoomActions;
 }
 

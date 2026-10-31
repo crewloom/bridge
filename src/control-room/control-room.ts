@@ -19,6 +19,7 @@ import type {
 } from '../channels/channel.interface.js';
 import type { IAgentEngine, AgentEngineEvent } from '../engines/engine.interface.js';
 import { SecurityPolicy } from '../security/policy.js';
+import { PersonalizationService } from '../personalization/index.js';
 import type { TelemetryEvent } from './event-server.js';
 import { ConfigManager } from '../config/config-manager.js';
 import { t } from '../i18n/index.js';
@@ -26,6 +27,7 @@ import { getStandardModelCatalog } from '../domain/model-catalog.js';
 import {
   buildModelsMenuView,
   buildSkillsMenuView,
+  buildPersonaMenuView,
   buildAgentsMenuView,
   buildModeMenuView,
   buildSessionsMenuView,
@@ -72,6 +74,7 @@ export class ControlRoom implements RoomActions {
   private readonly missionCard: MissionCard;
   private readonly callbackRouter = createCallbackRouter();
   private readonly context: RoomContext;
+  public readonly personalization: PersonalizationService;
 
   // Polymorphic Constructor: supports either options object or legacy 3-arguments
   constructor(options: ControlRoomOptions);
@@ -95,6 +98,7 @@ export class ControlRoom implements RoomActions {
     this.targetDir = this.cfgManager.config.targetDir;
     this.session = new RoomSession(this.cfgManager);
     this.policy = this.buildPolicy();
+    this.personalization = new PersonalizationService(this.cfgManager.stateDir);
 
     // Live view of the room: engine, policy and workspace are replaced at runtime, so read them lazily.
     const room = this;
@@ -107,6 +111,7 @@ export class ControlRoom implements RoomActions {
       get targetDir() { return room.targetDir; },
       get config() { return room.cfgManager.config; },
       get missionCard() { return room.missionCard; },
+      get personalization() { return room.personalization; },
       get actions(): RoomActions { return room; },
     } satisfies RoomContext;
     this.context = context;
@@ -181,6 +186,10 @@ export class ControlRoom implements RoomActions {
     } catch (err) {
       console.warn('⚠️ Warning: Engine connection failed at startup:', (err as Error).message);
     }
+
+    await this.personalization.load().catch((err: Error) => {
+      console.warn('⚠️ Warning: Personalization load failed:', err.message);
+    });
     this.isListening = true;
 
     if (this.allowedChatId && this.allowedChatId.trim()) {
@@ -347,6 +356,15 @@ export class ControlRoom implements RoomActions {
       skills: this.getAllAvailableSkills(),
       activeSkill: this.activeSkill,
       page,
+      language: this.language,
+    });
+    await presentMenu(this.channel, this.allowedChatId, view, editMsgId);
+  }
+
+  public async sendPersonaMenu(editMsgId?: string | number): Promise<void> {
+    const view = buildPersonaMenuView({
+      personas: this.personalization.listPersonas(),
+      activeName: this.personalization.forNewTask().persona?.name ?? null,
       language: this.language,
     });
     await presentMenu(this.channel, this.allowedChatId, view, editMsgId);

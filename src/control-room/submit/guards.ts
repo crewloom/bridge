@@ -6,7 +6,7 @@ import { busyNotice, INTERRUPT_WORDS, PROGRESS_WORDS, progressReply } from './bu
 
 export type SubmitDeps = Pick<
   RoomContext,
-  'channel' | 'engine' | 'chatId' | 'session' | 'policy' | 'targetDir' | 'config' | 'missionCard' | 'actions'
+  'channel' | 'engine' | 'chatId' | 'session' | 'policy' | 'targetDir' | 'config' | 'missionCard' | 'personalization' | 'actions'
 >;
 
 /**
