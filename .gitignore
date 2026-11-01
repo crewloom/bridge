@@ -32,3 +32,5 @@ state/
 room_state.json
 gate.json
 .config/
+pnpm-lock.yaml
+pnpm-workspace.yaml
