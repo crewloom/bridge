@@ -45,7 +45,11 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
   private handleOpenCodeEvent(event: OpenCodeEvent): void {
     const type = event.type;
     const props = (event.properties || {}) as Record<string, unknown>;
-    const sid = String(props.sessionID || event.sessionID || this.activeSessionId || '');
+    const part = props.part as Record<string, unknown> | undefined;
+    const info = props.info as Record<string, unknown> | undefined;
+    const eventSession = props.sessionID || event.sessionID || part?.sessionID || info?.sessionID;
+    if (this.activeSessionId && eventSession && eventSession !== this.activeSessionId) return;
+    const sid = String(eventSession || this.activeSessionId || '');
 
     // 1. Permission request event normalization (OpenCode emits 'permission.asked')
     if (type === 'permission.asked' || type === 'permission.ask') {
@@ -65,6 +69,7 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
       this.emit('event', {
         type: 'permission.ask',
         properties: {
+          sessionID: sid,
           id: permId,
           permission,
           patterns,
@@ -98,6 +103,7 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
           this.emit('event', {
             type: 'tool.execute',
             properties: {
+              sessionID: sid,
               id: toolId,
               tool: toolName,
               title: cmd,
@@ -111,6 +117,7 @@ export class OpenCodeAdapter extends EventEmitter implements IAgentEngine {
           this.emit('event', {
             type: 'tool.output',
             properties: {
+              sessionID: sid,
               id: toolId,
               stream: 'stdout',
               chunk: outStr,

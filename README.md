@@ -46,6 +46,10 @@ flowchart LR
     ControlRoom -->|Authorized Ops / SSH| Remote["🖥️ Remote VPS / Server"]
 ```
 
+OpenCode events with a session ID are isolated to the active engine session before text, tool output, permissions or completion can affect its run. The control room also rejects events explicitly addressed to another run session; engines without session IDs retain their existing behavior.
+
+أحداث OpenCode التي تحمل معرّف جلسة تبقى معزولة عن الجلسات الأخرى، بما فيها الردود والأدوات وطلبات الإذن وإتمام المهمة.
+
 ### The Live Experience
 
 ```text

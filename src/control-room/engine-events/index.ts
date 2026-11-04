@@ -25,6 +25,8 @@ const HANDLERS: ReadonlyMap<string, EventHandler> = new Map<string, EventHandler
 export async function handleEngineEvent(deps: EventDeps, event: AgentEngineEvent): Promise<void> {
   const run = deps.session.activeRun;
   if (!run) return;
+  const sessionId = event.properties?.sessionID || event.sessionID;
+  if (sessionId && sessionId !== run.sessionId) return;
   const handler = HANDLERS.get(event.type);
   if (!handler) return;
   await handler(deps, event, (event.properties || {}) as EventProps, run);

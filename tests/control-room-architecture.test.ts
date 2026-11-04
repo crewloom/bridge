@@ -10,7 +10,7 @@ import { ConfigManager } from '../src/config/config-manager.js';
 import { CallbackRouter, createCallbackRouter, type CallbackDeps } from '../src/control-room/callbacks/index.js';
 import { RoomSession } from '../src/control-room/session.js';
 import { classifyInquiry } from '../src/control-room/messages/index.js';
-import { buildCompletionReport } from '../src/control-room/engine-events/index.js';
+import { handleEngineEvent, type EventDeps, buildCompletionReport } from '../src/control-room/engine-events/index.js';
 import { PROMPT_GUARDS, type SubmitDeps } from '../src/control-room/submit/index.js';
 import { createRun } from '../src/control-room/run-factory.js';
 
@@ -170,4 +170,13 @@ test('prompt guards: destructive commands are refused, and a busy run can be int
   session.beginRun(createRun({ sessionId: 's', prompt: 'p', agent: 'a', model: 'm', mode: 'build', initialActivity: '' }));
   assert.equal(await deferWhileBusy!(submitDeps, 'وقف'), true);
   assert.ok(calls.includes('abortCurrentRun()'));
+});
+
+
+test('engine events from another session cannot complete the active run', async () => {
+  const { cfg, session } = makeSession();
+  const { deps } = fakeDeps(session, cfg);
+  session.beginRun(createRun({ sessionId: 'session-A', prompt: 'p', agent: 'a', model: 'm', mode: 'build', initialActivity: '' }));
+  await handleEngineEvent(deps as EventDeps, { type: 'step_finish', properties: { sessionID: 'session-B', status: 'done' } });
+  assert.equal(session.isBusy, true);
 });
