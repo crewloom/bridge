@@ -12,6 +12,7 @@ import { TelegramClient, escapeHtml } from '../telegram/telegram-client.js';
 import { OpenCodeClient } from '../opencode/opencode-client.js';
 import { ControlRoom } from '../control-room/control-room.js';
 import { AgentEventServer } from '../control-room/event-server.js';
+import { EventLog, withEventLog } from '../control-room/event-log.js';
 import { ChannelRegistry } from '../channels/registry.js';
 import type { IChannelAdapter } from '../channels/channel.interface.js';
 import { OpenCodeAdapter } from '../engines/opencode.adapter.js';
@@ -403,7 +404,11 @@ export async function cmdStart(args: string[]): Promise<void> {
     engine: engineAdapter,
     configManager: cfgManager,
   });
-  const events = new AgentEventServer((event) => room.receiveTelemetry(event), process.env.CREWLOOM_BRIDGE_TOKEN || '');
+  const eventLog = new EventLog(process.env.CREWLOOM_EVENT_LOG_DIR || path.join(process.cwd(), '.crewloom', 'private', 'events'));
+  const events = new AgentEventServer(
+    withEventLog(eventLog, (event) => room.receiveTelemetry(event),
+      (err) => error(`Event log write failed: ${err.message}`)),
+    process.env.CREWLOOM_BRIDGE_TOKEN || '');
 
   // Graceful shutdown handling
   const cleanup = async () => {
