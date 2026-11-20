@@ -10,6 +10,7 @@ import { ConfigManager } from '../src/config/config-manager.js';
 import { CallbackRouter, createCallbackRouter, type CallbackDeps } from '../src/control-room/callbacks/index.js';
 import { RoomSession } from '../src/control-room/session.js';
 import { classifyInquiry } from '../src/control-room/messages/index.js';
+import { completionStatus } from '../src/control-room/engine-events/completion-report.js';
 import { handleEngineEvent, type EventDeps, buildCompletionReport } from '../src/control-room/engine-events/index.js';
 import { PROMPT_GUARDS, type SubmitDeps } from '../src/control-room/submit/index.js';
 import { createRun } from '../src/control-room/run-factory.js';
@@ -145,7 +146,7 @@ test('buildCompletionReport covers failure, reply, terminal log and bare summary
   assert.match(failed, /<pre><code>boom<\/code><\/pre>/);
 
   const reply = buildCompletionReport(run, { failed: false, output: 'All good' }, 5, 'en');
-  assert.match(reply, /Execution Finished<\/b>\nAll good$/);
+  assert.match(reply, /UNVERIFIED<\/b>\nNo verifier ran\.\n\n🗣 <b>Agent claim \(not verified\):<\/b>\nAll good$/);
 
   const log = buildCompletionReport(run, { failed: false, output: 'Deploying\nnpm run build' }, 5, 'en');
   assert.match(log, /<pre><code>Deploying/);
@@ -153,6 +154,25 @@ test('buildCompletionReport covers failure, reply, terminal log and bare summary
   const summary = buildCompletionReport(run, { failed: false }, 7, 'ar');
   assert.match(summary, /الأوامر المنفذة: ⚙️ 3/);
   assert.match(summary, /7 ثانية/);
+  assert.match(summary, /UNVERIFIED/);
+  assert.doesNotMatch(summary, /بنجاح/);
+});
+
+test('completion report is UNVERIFIED unless a verifier passed; evidence precedes the agent claim', () => {
+  const run = createRun({ sessionId: 's', prompt: 'p', agent: 'a', model: 'm', mode: 'build', initialActivity: '' });
+  const claim = { failed: false, output: 'Done, all works' };
+
+  const none = buildCompletionReport(run, { ...claim, verifiers: [{ name: 'test', status: 'unavailable' }] }, 1, 'en');
+  assert.match(none, /UNVERIFIED/);
+  assert.doesNotMatch(none, /Verified<\/b>/);
+
+  const failing = buildCompletionReport(run, { ...claim, verifiers: [{ name: 'build', status: 'pass' }, { name: 'test', status: 'fail' }] }, 1, 'en');
+  assert.match(failing, /Verification Failed/);
+
+  const ok = buildCompletionReport(run, { ...claim, verifiers: [{ name: 'build', status: 'pass' }] }, 1, 'en');
+  assert.match(ok, /Verified<\/b>/);
+  assert.ok(ok.indexOf('build: pass') < ok.indexOf('Agent claim'));
+  assert.equal(completionStatus([]), 'unverified');
 });
 
 test('prompt guards: destructive commands are refused, and a busy run can be interrupted by a plain word', async () => {

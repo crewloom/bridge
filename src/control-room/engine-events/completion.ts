@@ -1,6 +1,6 @@
 import { escapeHtml } from '../../telegram/telegram-client.js';
 import { sayWithMenu } from '../reply.js';
-import { buildCompletionReport } from './completion-report.js';
+import { buildCompletionReport, type VerifierEvidence } from './completion-report.js';
 import type { EventHandler } from './types.js';
 
 /** The run ended: freeze the mission card and send the outcome once, however many finish events arrive. */
@@ -27,6 +27,7 @@ export const onRunFinished: EventHandler = async (deps, _event, props, run) => {
       exitCode: props.code,
       output: props.output ? String(props.output) : undefined,
       reasoning: props.reasoning ? String(props.reasoning) : undefined,
+      verifiers: Array.isArray(props.verifiers) ? (props.verifiers as VerifierEvidence[]) : undefined,
     },
     elapsed,
     session.currentLanguage

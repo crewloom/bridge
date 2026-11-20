@@ -471,7 +471,7 @@ test('ControlRoom - handleEngineEvent handles live output and sends terminal res
   await new Promise((r) => setTimeout(r, 25));
 
   // Check that final output message was sent
-  const resultMsg = mockChan.sentMessages.find((m) => m.text.includes('Execution Finished'));
+  const resultMsg = mockChan.sentMessages.find((m) => m.text.includes('UNVERIFIED'));
   assert.ok(resultMsg, 'Must send final execution result message');
   assert.ok(resultMsg.text.includes('All tests green'));
 
