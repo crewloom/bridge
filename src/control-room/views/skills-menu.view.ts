@@ -10,6 +10,8 @@ export interface SkillItem {
   id: string;
   name: string;
   description?: string | undefined;
+  origin?: string | undefined;
+  originLabel?: string | undefined;
 }
 
 export interface SkillsMenuViewOptions {
@@ -77,7 +79,8 @@ export function buildSkillsMenuView(options: SkillsMenuViewOptions): SkillsMenuV
   for (const sk of pool) {
     const isCurrent = sk.name === activeSkill;
     const descSnippet = sk.description ? sk.description.slice(0, 60) + (sk.description.length > 60 ? '…' : '') : (language === 'ar' ? 'مهارة متخصصة' : 'Specialized skill');
-    cardText += `${isCurrent ? '●' : '•'} <b>${escapeHtml(sk.name)}</b>\n`;
+    const badge = sk.originLabel ? ` [${escapeHtml(sk.originLabel)}]` : '';
+    cardText += `${isCurrent ? '●' : '•'} <b>${escapeHtml(sk.name)}</b>${badge}\n`;
     cardText += `  <code>${escapeHtml(descSnippet)}</code>\n`;
   }
 
