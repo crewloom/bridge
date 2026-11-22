@@ -8,13 +8,13 @@ import { PromptInjectionGuard } from './prompt-guard.js';
 import type { PathCheckResult, PromptDetectionResult, QuarantineResult } from '../domain/types.js';
 
 export const DEFAULT_DENY_PATTERNS: RegExp[] = [
-  /\brm\s+-(?:rf?|fr?)\s+[/~]/i,             // Destructive host wiping: rm -rf / or ~
+  /\brm\b(?=[^|;&\n]*\s(?:-[a-z]*r[a-z]*|--recursive)(?=\s))[^|;&\n]*\s[/~]/i, // Recursive rm aimed at / or ~, flags split or long-form
   /\bshutdown\b|\breboot\b/i,                // System power/reboot control
   /\bmkfs\b|\bfdisk\b|\bdd\s+if=/i,          // Raw disk formatting or overwriting
   /\bchmod\s+-(?:R\s+)?777\s+[/~]/i,         // Dangerous root/home open permissions
-  /\bcurl\b.*\|\s*(?:ba)?sh\b/i,             // Piping uninspected remote script to shell
-  /\bwget\b.*\|\s*(?:ba)?sh\b/i,             // Piping uninspected remote script to shell
-  /\bgit\s+push\s+--force\b/i,               // Destructive remote force push
+  /\b(?:curl|wget)\b[^\n]*\|\s*(?:sudo\s+(?:-\S+\s+)*)?(?:\S*\/)?(?:ba|z|da|k)?sh\b/i, // Piping uninspected remote script to a shell
+  /<\(\s*(?:curl|wget)\b/i,                  // Process substitution of a remote script: bash <(curl ...)
+  /\bgit\s+push\b[^\n;&|]*\s(?:-f\b|--force(?![-\w]))/i, // Destructive force push; --force-with-lease stays allowed
 ];
 
 export function normalizePath(p: string): string {
@@ -56,6 +56,16 @@ export function isPathSafe(targetPath: string, rootDir: string, allowedPaths: st
   }
 }
 
+/** Compiles a configured deny pattern; a pattern that does not compile must stop startup, not vanish. */
+function compileDenyPattern(source: string): RegExp {
+  try {
+    return new RegExp(source, 'i');
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(`Invalid deny pattern ${JSON.stringify(source)}: ${reason}`);
+  }
+}
+
 export class SecurityPolicy {
   public readonly targetDir: string;
   public readonly allowedPaths: string[];
@@ -69,11 +79,7 @@ export class SecurityPolicy {
 
     if (customPatterns && customPatterns.length > 0) {
       for (const pat of customPatterns) {
-        try {
-          this.denyPatterns.push(new RegExp(pat, 'i'));
-        } catch {
-          // Ignore invalid regex
-        }
+        this.denyPatterns.push(compileDenyPattern(pat));
       }
     }
 
