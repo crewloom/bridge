@@ -77,7 +77,7 @@ OpenCode events with a session ID are isolated to the active engine session befo
 
 Repository release: v2.2.5. Package metadata: `crewloom-bridge`. At the 2026-11-23 audit, this package name was not available in the public npm registry; the legacy `agentgram` package resolved to 2.0.9. Running `npx agentgram` does not install this repository release.
 
-Until the canonical package name and publication plan are confirmed, use a reviewed source checkout rather than presenting the legacy npm package as the current release:
+The canonical name is `crewloom-bridge`; `agentgram` is the identified legacy npm package. Until `crewloom-bridge` is published, use a reviewed source checkout rather than presenting the legacy npm package as the current release:
 
 ```bash
 git clone https://github.com/crewloom/bridge.git
