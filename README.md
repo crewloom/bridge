@@ -3,7 +3,7 @@
 > **Turn your Telegram into a live AI Agent Control Room & Ops Mission Control**  
 > Control [OpenCode](https://opencode.ai), AI coding agents, and terminal operations on your machine or VPS directly from your phone via Telegram.
 
-[![npm version](https://img.shields.io/npm/v/agentgram.svg?style=flat-square&logo=npm&color=CB3837)](https://www.npmjs.com/package/agentgram)
+[![legacy npm version](https://img.shields.io/npm/v/agentgram.svg?label=legacy%20npm&style=flat-square&logo=npm&color=CB3837)](https://www.npmjs.com/package/agentgram)
 [![dependencies](https://img.shields.io/badge/dependencies-0%20(zero)-success.svg?style=flat-square)](https://www.npmjs.com/package/agentgram)
 [![CI Matrix](https://img.shields.io/github/actions/workflow/status/crewloom/bridge/ci.yml?branch=main&label=CI%20matrix&style=flat-square&logo=githubactions&logoColor=white)](https://github.com/crewloom/bridge/actions)
 [![GitHub release](https://img.shields.io/github/v/release/crewloom/bridge?style=flat-square&color=3b82f6&logo=github)](https://github.com/crewloom/bridge/releases/latest)
@@ -12,20 +12,19 @@
 [![Node.js](https://img.shields.io/badge/Node.js-22%20..%2026-green.svg?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/agentgram"><b>📦 View on NPM</b></a> •
+  <a href="https://www.npmjs.com/package/agentgram"><b>Legacy npm package</b></a> •
   <a href="https://github.com/crewloom/bridge/releases/latest"><b>🏷️ Releases</b></a> •
-  <a href="#-quick-start"><b>🚀 Quick Start</b></a> •
-  <a href="#-telegram-experience"><b>📱 Features</b></a> •
-  <a href="#-frequently-asked-questions-faq"><b>❓ FAQ</b></a>
+  <a href="#installation-and-distribution-status"><b>🚀 Quick Start</b></a> •
+  <a href="#-telegram-controls--commands"><b>📱 Features</b></a>
 </p>
 
 ---
 
-## 🌟 Why AgentGram?
+## Bridge workflow (legacy AgentGram naming)
 
 Developers shouldn't be chained to their desks waiting for an AI agent to finish modifying code, executing test suites, or running remote deployment scripts.
 
-**AgentGram** turns your phone into a mobile developer cockpit:
+**The bridge** turns your phone into a mobile developer cockpit:
 * 📲 **Live Streaming Mission Control:** Real-time progress updates inside a dynamic message (updates smoothly every ~2.5s with tools, steps, and output tails).
 * 🔘 **One-Tap Permission Buttons:** Approve or reject file edits and commands with `[ ✅ Allow Once ]`, `[ ♾️ Always Allow ]`, or `[ ⛔ Reject ]`.
 * ⚡ **Auto Mode:** Allows autonomous execution within configured policies. The blocklist is not a guarantee against every destructive command.
