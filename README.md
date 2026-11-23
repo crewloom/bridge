@@ -28,7 +28,7 @@ Developers shouldn't be chained to their desks waiting for an AI agent to finish
 **AgentGram** turns your phone into a mobile developer cockpit:
 * 📲 **Live Streaming Mission Control:** Real-time progress updates inside a dynamic message (updates smoothly every ~2.5s with tools, steps, and output tails).
 * 🔘 **One-Tap Permission Buttons:** Approve or reject file edits and commands with `[ ✅ Allow Once ]`, `[ ♾️ Always Allow ]`, or `[ ⛔ Reject ]`.
-* ⚡ **Auto Mode:** Enable full autonomy for routine tasks; safety policies automatically intercept destructive commands.
+* ⚡ **Auto Mode:** Allows autonomous execution within configured policies. The blocklist is not a guarantee against every destructive command.
 * 🛡️ **Application-level prompt-injection checks:** Multi-layer defense against role hijacking, jailbreaks, delimiter evasion, and malicious prompt injections.
 * 🔌 **Extensible Channels & Engines:** Built-in **Telegram** and **Console** channels, a dedicated **OpenCode** adapter, and generic CLI wrappers for **Claude Code**, **Aider**, and **Shell**. Configure additional CLI engines or load your own local channel/engine plugin without rebuilding the bridge. Slack, Discord, and Webhooks require an additional adapter.
 * 🌐 **Multi-Machine & Server Ops:** Run operations, SSH jump-host connections, deploy scripts (`pinpoint-go`), and remote log diagnostics directly from your phone.
@@ -40,7 +40,7 @@ Developers shouldn't be chained to their desks waiting for an AI agent to finish
 
 ```mermaid
 flowchart LR
-    User["📱 Telegram / Console / Webhook"] -->|IChannelAdapter| ControlRoom["⚡ AgentGram Control Room"]
+    User["📱 Telegram / Console (plugins optional)"] -->|IChannelAdapter| ControlRoom["⚡ AgentGram Control Room"]
     ControlRoom -->|IAgentEngine| Engine["🤖 OpenCode / Claude Code / Shell"]
     Engine -->|Configured Execution| Project["📂 Project Files & Git"]
     ControlRoom -->|Authorized Ops / SSH| Remote["🖥️ Remote VPS / Server"]
@@ -189,7 +189,6 @@ The bridge includes application-level policy checks. These are not an operating-
 
 ```text
 agentgram <command> [options]
-npx agentgram <command> [options]
 
 COMMANDS:
   init               Interactive setup wizard & automatic Telegram pairing
@@ -222,4 +221,4 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 Distributed under the **MIT License**. See [LICENSE](LICENSE) for more details.
 
-Developed with ❤️ by **[Rumuze](https://rumuze.com)**.
+Developed by **Rumuze**. The canonical attribution URL is pending owner confirmation.
