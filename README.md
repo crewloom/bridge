@@ -1,35 +1,34 @@
-# ⚡ AgentGram
+# Crewloom Bridge (legacy AgentGram CLI aliases)
 
 > **Turn your Telegram into a live AI Agent Control Room & Ops Mission Control**  
 > Control [OpenCode](https://opencode.ai), AI coding agents, and terminal operations on your machine or VPS directly from your phone via Telegram.
 
-[![npm version](https://img.shields.io/npm/v/agentgram.svg?style=flat-square&logo=npm&color=CB3837)](https://www.npmjs.com/package/agentgram)
+[![legacy npm version](https://img.shields.io/npm/v/agentgram.svg?label=legacy%20npm&style=flat-square&logo=npm&color=CB3837)](https://www.npmjs.com/package/agentgram)
 [![dependencies](https://img.shields.io/badge/dependencies-0%20(zero)-success.svg?style=flat-square)](https://www.npmjs.com/package/agentgram)
-[![CI Matrix](https://img.shields.io/github/actions/workflow/status/rumuze/agentgram/ci.yml?branch=main&label=CI%20matrix&style=flat-square&logo=githubactions&logoColor=white)](https://github.com/rumuze/agentgram/actions)
-[![GitHub release](https://img.shields.io/github/v/release/rumuze/agentgram?style=flat-square&color=3b82f6&logo=github)](https://github.com/rumuze/agentgram/releases/latest)
+[![CI Matrix](https://img.shields.io/github/actions/workflow/status/crewloom/bridge/ci.yml?branch=main&label=CI%20matrix&style=flat-square&logo=githubactions&logoColor=white)](https://github.com/crewloom/bridge/actions)
+[![GitHub release](https://img.shields.io/github/v/release/crewloom/bridge?style=flat-square&color=3b82f6&logo=github)](https://github.com/crewloom/bridge/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-22%20..%2026-green.svg?style=flat-square&logo=node.js&logoColor=white)](https://nodejs.org)
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/agentgram"><b>📦 View on NPM</b></a> •
-  <a href="https://github.com/rumuze/agentgram/releases/latest"><b>🏷️ Releases</b></a> •
-  <a href="#-quick-start"><b>🚀 Quick Start</b></a> •
-  <a href="#-telegram-experience"><b>📱 Features</b></a> •
-  <a href="#-frequently-asked-questions-faq"><b>❓ FAQ</b></a>
+  <a href="https://www.npmjs.com/package/agentgram"><b>Legacy npm package</b></a> •
+  <a href="https://github.com/crewloom/bridge/releases/latest"><b>🏷️ Releases</b></a> •
+  <a href="#installation-and-distribution-status"><b>🚀 Quick Start</b></a> •
+  <a href="#-telegram-controls--commands"><b>📱 Features</b></a>
 </p>
 
 ---
 
-## 🌟 Why AgentGram?
+## Bridge workflow (legacy AgentGram naming)
 
 Developers shouldn't be chained to their desks waiting for an AI agent to finish modifying code, executing test suites, or running remote deployment scripts.
 
-**AgentGram** turns your phone into a mobile developer cockpit:
+**The bridge** turns your phone into a mobile developer cockpit:
 * 📲 **Live Streaming Mission Control:** Real-time progress updates inside a dynamic message (updates smoothly every ~2.5s with tools, steps, and output tails).
 * 🔘 **One-Tap Permission Buttons:** Approve or reject file edits and commands with `[ ✅ Allow Once ]`, `[ ♾️ Always Allow ]`, or `[ ⛔ Reject ]`.
-* ⚡ **Auto Mode:** Enable full autonomy for routine tasks; safety policies automatically intercept destructive commands.
-* 🛡️ **Enterprise Prompt Injection Shield:** Multi-layer defense against role hijacking, jailbreaks, delimiter evasion, and malicious prompt injections.
+* ⚡ **Auto Mode:** Allows autonomous execution within configured policies. The blocklist is not a guarantee against every destructive command.
+* 🛡️ **Application-level prompt-injection checks:** Multi-layer defense against role hijacking, jailbreaks, delimiter evasion, and malicious prompt injections.
 * 🔌 **Extensible Channels & Engines:** Built-in **Telegram** and **Console** channels, a dedicated **OpenCode** adapter, and generic CLI wrappers for **Claude Code**, **Aider**, and **Shell**. Configure additional CLI engines or load your own local channel/engine plugin without rebuilding the bridge. Slack, Discord, and Webhooks require an additional adapter.
 * 🌐 **Multi-Machine & Server Ops:** Run operations, SSH jump-host connections, deploy scripts (`pinpoint-go`), and remote log diagnostics directly from your phone.
 * ⚡ **Zero npm Runtime Dependencies:** Uses Node.js built-ins. Your selected coding engine must be installed or available separately.
@@ -40,7 +39,7 @@ Developers shouldn't be chained to their desks waiting for an AI agent to finish
 
 ```mermaid
 flowchart LR
-    User["📱 Telegram / Console / Webhook"] -->|IChannelAdapter| ControlRoom["⚡ AgentGram Control Room"]
+    User["📱 Telegram / Console (plugins optional)"] -->|IChannelAdapter| ControlRoom["⚡ AgentGram Control Room"]
     ControlRoom -->|IAgentEngine| Engine["🤖 OpenCode / Claude Code / Shell"]
     Engine -->|Configured Execution| Project["📂 Project Files & Git"]
     ControlRoom -->|Authorized Ops / SSH| Remote["🖥️ Remote VPS / Server"]
@@ -74,60 +73,21 @@ OpenCode events with a session ID are isolated to the active engine session befo
 
 ---
 
-## 🚀 Quick Start
+## Installation and distribution status
 
-### 1. Instant Run via NPX (Zero Install)
+Repository release: v2.2.5. Package metadata: `crewloom-bridge`. At the 2026-11-23 audit, this package name was not available in the public npm registry; the legacy `agentgram` package resolved to 2.0.9. Running `npx agentgram` does not install this repository release.
 
-Run immediately in any repository without installing globally:
-
-```bash
-# Launch interactive pairing wizard (takes 30 seconds)
-npx agentgram init
-
-# Start the live control room
-npx agentgram start
-
-# Or run in background as a detached daemon
-npx agentgram start --daemon
-```
-
-### 2. Global Installation
-
-Install globally across your development machine or VPS:
+The canonical name is `crewloom-bridge`; `agentgram` is the identified legacy npm package. Until `crewloom-bridge` is published, use a reviewed source checkout rather than presenting the legacy npm package as the current release:
 
 ```bash
-npm install -g agentgram
-
-# Initialize pairing in any repo
-agentgram init
-
-# Start control room
-agentgram start
+git clone https://github.com/crewloom/bridge.git
+cd bridge
+npm ci
+npm run build
+node dist/index.js --help
 ```
 
-### 3. Running as a Persistent System Service (Auto-Start on Boot)
-
-Want AgentGram to run 24/7 on your machine or cloud VPS?
-
-```bash
-# On macOS (installs to ~/Library/LaunchAgents/com.agentgram.plist)
-# On Linux (installs to ~/.config/systemd/user/agentgram.service)
-npx agentgram service install
-
-# Check service status
-npx agentgram service status
-```
-
-### 4. Via Docker Compose (Headless Cloud VPS)
-
-Run 24/7 on any cloud server or VPS:
-
-```bash
-git clone https://github.com/rumuze/agentgram.git && cd agentgram
-TG_BOT_TOKEN="your_bot_token" TG_ALLOWED_CHAT_ID="your_chat_id" docker compose up -d
-```
-
----
+Review dependencies and configuration before running. Telegram setup needs a bot token; keep it out of commits and logs. The `agentgram` executable name remains a compatibility alias in source, not proof of npm publication.
 
 ## 🎮 Telegram Controls & Commands
 
@@ -216,7 +176,7 @@ The bridge includes application-level policy checks. These are not an operating-
    - **Unicode & Obfuscation Stripping:** Normalizes Unicode (NFKC) and strips zero-width/invisible evasion characters (`\u200B`, `\u200C`, `\uFEFF`, `\u2060`) and BiDi overrides (`\u202E`). Recursively inspects base64 payloads.
    - **Data Exfiltration Defense:** Blocks markdown image (`![exfil](https://.../?token=)`) and HTML link exfiltration vectors.
 2. **🔐 Cryptographic Quarantine Envelopes:**
-   - External error logs, server alerts, and untrusted inputs are wrapped inside isolated blocks (`<untrusted-report id="...">`) signed with cryptographically random nonces (`secrets.token_hex(8)`).
+   - External error logs, server alerts, and untrusted inputs are wrapped inside isolated blocks (`<untrusted-report id="...">`) delimited with random nonces. A nonce is not a digital signature and does not authenticate the source.
 3. **🚫 Execution Blocklist:**
    - Irreversible destructive host wiping is blocked by default (`rm -rf /`, `rm -rf ~`, `mkfs`, `shutdown`, `dd if=`).
 4. **👤 Single Chat ID Lock:** Every message and inline callback query validates `chat.id == ALLOWED_CHAT_ID`. Unknown users are ignored.
@@ -228,7 +188,6 @@ The bridge includes application-level policy checks. These are not an operating-
 
 ```text
 agentgram <command> [options]
-npx agentgram <command> [options]
 
 COMMANDS:
   init               Interactive setup wizard & automatic Telegram pairing
@@ -261,4 +220,4 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 Distributed under the **MIT License**. See [LICENSE](LICENSE) for more details.
 
-Developed with ❤️ by **[Rumuze](https://rumuze.com)**.
+
