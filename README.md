@@ -220,4 +220,4 @@ Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md)
 
 Distributed under the **MIT License**. See [LICENSE](LICENSE) for more details.
 
-Developed by **Rumuze**. The canonical attribution URL is pending owner confirmation.
+
