@@ -65,7 +65,7 @@ export {
 } from './constants.js';
 
 // Re-export CLI
-export { runCli } from './cli/index.js';
+export { runCli, deprecatedBinNotice } from './cli/index.js';
 
 // Auto-run CLI if invoked directly via terminal / npx
 if (typeof require !== 'undefined' && require.main === module) {

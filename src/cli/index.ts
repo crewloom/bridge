@@ -605,10 +605,25 @@ export function cmdHelp(): void {
   log(`  agentgram service install\n`);
 }
 
+/** Executable names kept only for compatibility; `crewloom-bridge` is the supported one. */
+const DEPRECATED_BIN_NAMES = ['cl-bridge', 'agentgram', 'ag', 'rumuze-edit'];
+
+/**
+ * Returns the deprecation notice for a legacy executable name, or null for a supported name.
+ * @param binName Basename of the executable the user invoked.
+ */
+export function deprecatedBinNotice(binName: string): string | null {
+  const name = binName.replace(/\.(c|m)?js$/, '');
+  if (!DEPRECATED_BIN_NAMES.includes(name)) return null;
+  return `Warning: the "${name}" command is deprecated and will be removed in a future major release. Use "crewloom-bridge" instead.`;
+}
+
 /**
  * Main entry point for CLI execution.
  */
 export async function runCli(argv: string[] = process.argv.slice(2)): Promise<void> {
+  const notice = deprecatedBinNotice(path.basename(process.argv[1] ?? ''));
+  if (notice) process.stderr.write(`${notice}\n`);
   const cmd = argv[0]?.toLowerCase();
   const rest = argv.slice(1);
 

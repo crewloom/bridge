@@ -23,6 +23,9 @@ vendor/
 composer.lock
 
 # Rumuze Edit State & Secrets
+# Project config can hold a bot token: never commit it (env vars are the safe alternative).
+.agentgram.json
+.rumuze-edit.json
 daemon.log
 daemon.err
 daemon.pid

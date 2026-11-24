@@ -19,6 +19,7 @@
   ],
   "scripts": {
     "build": "tsup",
+    "pretest": "npm run build",
     "test": "tsx --test tests/*.test.ts",
     "prepack": "npm run build",
     "prepublishOnly": "npm run build && npm test",
