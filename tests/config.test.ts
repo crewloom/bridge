@@ -44,3 +44,13 @@ test('ConfigManager - manages workspaces list cleanly', () => {
     } catch {}
   }
 });
+
+test('deprecatedBinNotice - warns for legacy bin names only', async () => {
+  const { deprecatedBinNotice } = await import('../dist/index.js');
+  for (const name of ['agentgram', 'ag', 'cl-bridge', 'rumuze-edit', 'agentgram.js']) {
+    assert.match(deprecatedBinNotice(name) ?? '', /deprecated.*crewloom-bridge/);
+  }
+  assert.equal(deprecatedBinNotice('crewloom-bridge'), null);
+  assert.equal(deprecatedBinNotice('crewloom'), null);
+  assert.equal(deprecatedBinNotice('index.js'), null);
+});

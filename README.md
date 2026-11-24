@@ -87,7 +87,7 @@ npm run build
 node dist/index.js --help
 ```
 
-Review dependencies and configuration before running. Telegram setup needs a bot token; keep it out of commits and logs. The `agentgram` executable name remains a compatibility alias in source, not proof of npm publication.
+Review dependencies and configuration before running. Telegram setup needs a bot token; keep it out of commits and logs. The supported executables are `crewloom` and `crewloom-bridge`. `cl-bridge`, `agentgram`, `ag` and `rumuze-edit` are deprecated aliases that print a warning and will be removed in a future major release. The package is not yet published to npm; CI checks that `npm pack` ships `dist/index.js`. Prefer the token environment variables (`AGENTGRAM_BOT_TOKEN`, `RUMUZE_EDIT_BOT_TOKEN`, `TGBRIDGE_TOKEN`) over a config file.
 
 ## 🎮 Telegram Controls & Commands
 
