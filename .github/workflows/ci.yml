@@ -45,7 +45,7 @@ jobs:
           node dist/index.js status
 
       - name: Verify the npm package ships the built CLI
-        run: npm pack --dry-run --json | node -e "const f=JSON.parse(require('fs').readFileSync(0,'utf8'))[0].files.map(x=>x.path); if(!f.includes('dist/index.js')){console.error('dist/index.js missing from package');process.exit(1)}"
+        run: npm pack --dry-run --json --ignore-scripts | node -e "const f=JSON.parse(require('fs').readFileSync(0,'utf8'))[0].files.map(x=>x.path); if(!f.includes('dist/index.js')){console.error('dist/index.js missing from package');process.exit(1)}"
 
   secret-scan:
     name: Secret scan
